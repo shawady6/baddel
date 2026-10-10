@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baddel – بدّل — الإعدادات</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img src="icons/icon-128.png" alt="">
+    <div class="titles">
+      <h1>Baddel · بدّل</h1>
+      <p>صلّح الكلام اللي اتكتب بلغة غلط (عربي ↔ English) بضغطة واحدة</p>
+    </div>
+    <span class="badge" id="ver"></span>
+    <label class="switch master">
+      <input type="checkbox" id="enabled" role="switch">
+      <span class="track"></span>
+      <span class="switch-label">مفعّلة</span>
+    </label>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="h-shortcut">
+      <h2 id="h-shortcut">الاختصار</h2>
+      <p class="muted">اختار الاختصار اللي تحوّل بيه النص المحدد (أو آخر كلمة قبل المؤشر).</p>
+      <div class="shortcut-row">
+        <button type="button" class="recorder" id="recorder" aria-describedby="shortcut-msg">
+          <span class="keys" id="keys"></span>
+          <span class="rec-hint" id="rec-hint">اضغط للتغيير</span>
+        </button>
+        <button type="button" class="btn" id="reset">الافتراضي</button>
+      </div>
+      <p class="msg" id="shortcut-msg" role="status" aria-live="polite"></p>
+      <ul class="notes">
+        <li>الاختصار بيشتغل مهما كانت لغة الكيبورد الحالية.</li>
+        <li>لازم تستخدم <b>Ctrl</b> أو <b>Alt</b> أو <b>⌘</b> مع حرف أو رقم.</li>
+        <li>بعد التحويل النص بيفضل متحدد، فلو ضغطت الاختصار تاني بيرجع زي ما كان.</li>
+        <li>مش بيشتغل في صفحات المتصفح الداخلية (<bdi dir="ltr">chrome://</bdi>) ولا في <bdi dir="ltr">Chrome Web Store</bdi>.</li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="h-behavior">
+      <h2 id="h-behavior">السلوك</h2>
+      <div class="row">
+        <div>
+          <h3>اتجاه التحويل</h3>
+          <p class="muted">"تلقائي" بيحدد الاتجاه حسب اللغة الأكتر في النص.</p>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="اتجاه التحويل">
+          <label><input type="radio" name="direction" value="auto"><span>تلقائي</span></label>
+          <label><input type="radio" name="direction" value="ar2en"><span>عربي ← English</span></label>
+          <label><input type="radio" name="direction" value="en2ar"><span>English ← عربي</span></label>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <h3>آخر كلمة قبل المؤشر</h3>
+          <p class="muted">لو مفيش نص محدد، حوّل آخر كلمة اتكتبت.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="lastWord" role="switch" aria-label="آخر كلمة قبل المؤشر">
+          <span class="track"></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-try">
+      <h2 id="h-try">جرّبها</h2>
+      <p class="muted">اكتب أو الصق نص بلغة غلط، والنتيجة بتظهر على طول.</p>
+      <div class="try">
+        <textarea id="try-in" dir="auto" placeholder="اكتب أو الصق هنا…" aria-label="النص الأصلي"></textarea>
+        <span class="arrow" aria-hidden="true">⇄</span>
+        <textarea id="try-out" dir="auto" readonly aria-label="النتيجة"></textarea>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    الإضافة بتشتغل بالكامل جوه المتصفح، والنصوص اللي بتكتبها مبتتبعتش لأي مكان.
+  </footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="shared.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: node tests/test_logic.js
+      - name: Build zip
+        run: python3 scripts/release.py
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/baddel.zip
+          generate_release_notes: true

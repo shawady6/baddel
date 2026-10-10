@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baddel – بدّل</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body class="popup">
+<div class="wrap">
+  <header class="top">
+    <img src="icons/icon-128.png" alt="">
+    <div class="titles">
+      <h1>Baddel · بدّل</h1>
+      <p>عربي ↔ English</p>
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <div>
+        <h3>الحالة</h3>
+        <p class="muted" id="state-text"></p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabled" role="switch" aria-label="تفعيل الإضافة">
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="row">
+      <div>
+        <h3>الاختصار</h3>
+        <p class="muted">حدّد النص واضغط</p>
+      </div>
+      <span class="keys" id="keys"></span>
+    </div>
+  </section>
+
+  <button type="button" class="btn primary block" id="open">فتح الإعدادات</button>
+</div>
+<script src="shared.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

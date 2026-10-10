@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baddel – بدّل | صلّح الكتابة بلغة الكيبورد الغلط</title>
+<meta name="description" content="Baddel – بدّل: إضافة مجانية ومفتوحة المصدر لـ Chrome وEdge بتحوّل الكلام اللي اتكتب بلغة غلط بين العربي والإنجليزي بضغطة اختصار. Arabic ↔ English keyboard fixer.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="icon" href="assets/icon-48.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Baddel – بدّل | Arabic ↔ English keyboard fixer">
+<meta property="og:description" content="كتبت عربي على كيبورد إنجليزي؟ بدّل بضغطة. مجانية ومفتوحة المصدر وبتشتغل محلي.">
+<meta property="og:image" content="https://shawady6.github.io/baddel/assets/og.png">
+<meta property="og:url" content="https://shawady6.github.io/baddel/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top"><img src="assets/icon-48.png" alt="" width="32" height="32"><span>Baddel · بدّل</span></a>
+  <nav aria-label="Main">
+    <a href="#demo" data-i="nav_demo">جرّبها</a>
+    <a href="#install" class="keep" data-i="nav_install">التثبيت</a>
+    <a href="#faq" data-i="nav_faq">أسئلة شائعة</a>
+    <a href="https://github.com/shawady6/baddel" class="keep" rel="noopener">GitHub</a>
+    <button type="button" class="lang" id="lang" aria-label="Language / اللغة">EN</button>
+  </nav>
+</header>
+
+<main id="top">
+  <div class="container hero">
+    <div class="hero-text">
+      <span class="pill" data-i="pill">مجانية · مفتوحة المصدر · بتشتغل جوه متصفحك</span>
+      <h1 data-i="h1">كتبت عربي وانت على كيبورد إنجليزي؟ <em>بدّل</em> بضغطة.</h1>
+      <p class="lead" data-i="lead"><b>Baddel · بدّل</b> إضافة لـ Chrome وEdge بتحوّل الكلام اللي اتكتب بلغة غلط (زي <code dir="ltr">hgsghl</code> بدل «السلام») للصح بضغطة اختصار واحدة، من غير ما تمسح وتكتب من الأول.</p>
+      <div class="cta">
+        <a class="btn primary" id="dl" href="https://github.com/shawady6/baddel/releases/latest/download/baddel.zip"><span data-i="dl">حمّل الإضافة (ZIP)</span><small dir="ltr">v1.3.0</small></a>
+        <a class="btn" href="#install" data-i="how">إزاي أثبّتها؟</a>
+      </div>
+      <p class="note" data-i="platforms">للكمبيوتر: Chrome وEdge وBrave وOpera.</p>
+      <p class="notice" id="mobile" hidden data-i="mobile_note">الإضافة بتشتغل على متصفحات الكمبيوتر بس. افتح الصفحة دي من الكمبيوتر عشان تثبّتها.</p>
+    </div>
+
+    <div class="mock" aria-hidden="true">
+      <div class="mock-bar"><i></i><i></i><i></i></div>
+      <div class="mock-body">
+        <div class="field"><span id="typed"></span><span class="caret"></span></div>
+        <div class="keys-row" dir="ltr"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>X</kbd></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="section container" id="demo">
+    <h2 data-i="demo_h">جرّبها دلوقتي</h2>
+    <p class="sub" data-i="demo_sub">اكتب أو الصق نص بلغة غلط والنتيجة بتظهر فورا. دي نفس خريطة التحويل اللي جوه الإضافة.</p>
+    <div class="try">
+      <div>
+        <label for="in" class="vh" data-i="in_label">النص اللي اتكتب غلط</label>
+        <textarea id="in" dir="auto" spellcheck="false" placeholder="hgsghl ugd;l"></textarea>
+      </div>
+      <span class="arrow" aria-hidden="true">⇄</span>
+      <div>
+        <label for="out" class="vh" data-i="out_label">النتيجة</label>
+        <textarea id="out" dir="auto" readonly></textarea>
+      </div>
+    </div>
+    <div class="chips"><span class="chips-label" data-i="chips_label">جرّب مثال:</span>
+      <button type="button" class="chip" data-sample="hgsghl ugd;l" dir="ltr">hgsghl ugd;l</button>
+      <button type="button" class="chip" data-sample="lvpfh" dir="ltr">lvpfh</button>
+      <button type="button" class="chip" data-sample="اثممخ" dir="rtl">اثممخ</button>
+    </div>
+  </section>
+
+  <section class="section container" id="features">
+    <h2 data-i="f_h">ليه بدّل؟</h2>
+    <div class="cards">
+      <article class="card"><div class="ico">⌨️</div><h3 data-i="f1_t">بتشتغل مهما كانت لغة الكيبورد</h3><p data-i="f1_d">الاختصار بيعتمد على مفتاح الكيبورد نفسه، فمش هتتلخبط لو كنت على عربي أو إنجليزي.</p></article>
+      <article class="card"><div class="ico">↩️</div><h3 data-i="f2_t">تحويل وتراجع بنفس الضغطة</h3><p data-i="f2_d">بعد التحويل النص بيفضل متحدد، وضغطة تانية بترجّعه زي ما كان.</p></article>
+      <article class="card"><div class="ico">🎛️</div><h3 data-i="f3_t">اختصار على مزاجك</h3><p data-i="f3_d">صفحة إعدادات فيها تسجيل الاختصار، واتجاه التحويل، وتشغيل وإيقاف الإضافة.</p></article>
+      <article class="card"><div class="ico">🔒</div><h3 data-i="f4_t">خصوصية كاملة</h3><p data-i="f4_d">كل حاجة بتحصل جوه المتصفح، ومفيش أي اتصال بالإنترنت ولا جمع بيانات.</p></article>
+    </div>
+  </section>
+
+  <section class="section container" id="install">
+    <h2 data-i="inst_h">التثبيت في 6 خطوات</h2>
+    <p class="sub" data-i="inst_sub">الإضافة لسه مش على متجر Chrome، فبتتثبّت يدويا. هتاخد دقيقتين بس.</p>
+
+    <ol class="steps">
+      <li>
+        <div class="num">1</div>
+        <div class="body">
+          <h3 data-i="st1_t">حمّل الملف</h3>
+          <p data-i="st1_d">دوس على «حمّل الإضافة» عشان تنزل <code dir="ltr">baddel.zip</code>.</p>
+          <a class="btn primary sm" href="https://github.com/shawady6/baddel/releases/latest/download/baddel.zip"><span data-i="dl2">حمّل baddel.zip</span></a>
+        </div>
+      </li>
+      <li>
+        <div class="num">2</div>
+        <div class="body">
+          <h3 data-i="st2_t">فك الضغط في مكان ثابت</h3>
+          <p data-i="st2_d">كليك يمين ← Extract all. وخلّي الفولدر <b>baddel</b> في مكان مش هتمسحه، لأن المتصفح بيقرا الإضافة منه.</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">3</div>
+        <div class="body">
+          <h3 data-i="st3_t">افتح صفحة الإضافات</h3>
+          <p data-i="st3_d">انسخ الرابط واحطه في شريط العنوان (الروابط دي مينفعش تتفتح بالضغط عليها):</p>
+          <div class="tabs" role="tablist" aria-label="Browser">
+            <button type="button" role="tab" data-b="chrome" data-url="chrome://extensions">Chrome</button>
+            <button type="button" role="tab" data-b="edge" data-url="edge://extensions">Edge</button>
+            <button type="button" role="tab" data-b="brave" data-url="brave://extensions">Brave</button>
+            <button type="button" role="tab" data-b="opera" data-url="opera://extensions">Opera</button>
+          </div>
+          <div class="urlbox" dir="ltr"><code id="ext-url">chrome://extensions</code><button type="button" class="copy" id="copy-url">نسخ</button></div>
+        </div>
+      </li>
+      <li>
+        <div class="num">4</div>
+        <div class="body">
+          <h3 data-i="st4_t">فعّل وضع المطوّر</h3>
+          <p data-i="st4_d">شغّل مفتاح <b>Developer mode</b> اللي فوق على اليمين.</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">5</div>
+        <div class="body">
+          <h3 data-i="st5_t">حمّل الفولدر</h3>
+          <p data-i="st5_d">دوس <b>Load unpacked</b> واختار فولدر <b>baddel</b> (اللي جواه ملف <code dir="ltr">manifest.json</code>).</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">6</div>
+        <div class="body">
+          <h3 data-i="st6_t">جرّبها</h3>
+          <p data-i="st6_d">ثبّت الأيقونة من شكل البازل 🧩 ← دبوس. وبعدين اكتب في أي خانة وحدد الكلام واضغط <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="tips">
+      <div class="tip"><h3 data-i="warn_t">تنبيه عند فتح المتصفح</h3><p data-i="warn_d">Chrome ممكن يعرض تنبيه عن إضافات وضع المطوّر لما تفتحه. ده طبيعي مع الإضافات اللي بتتثبّت يدويا؛ اتجاهله أو اضغط Cancel.</p></div>
+      <div class="tip"><h3 data-i="upd_t">التحديث</h3><p data-i="upd_d">لما ينزل إصدار جديد: نزّله وفك ضغطه فوق نفس الفولدر، وبعدين دوس زرار التحديث ↻ على كارت الإضافة.</p></div>
+    </div>
+  </section>
+
+  <section class="section container" id="faq">
+    <h2 data-i="faq_h">أسئلة شائعة</h2>
+    <div class="faq">
+      <details><summary data-i="q1">ليه بتطلب صلاحية «كل المواقع»؟</summary><p data-i="a1">عشان تقدر تقرا النص اللي في خانة الكتابة وتحوّله في أي موقع. ومبتتصرفش غير لما تضغط الاختصار، وبتتعامل بس مع الكلام اللي حددته أو آخر كلمة.</p></details>
+      <details><summary data-i="q2">بتبعت كلامي لأي مكان؟</summary><p data-i="a2">لأ. مفيش أي طلبات شبكة في الكود، والإعدادات بس هي اللي بتتخزّن في المتصفح. الكود مفتوح وتقدر تراجعه بنفسك على GitHub.</p></details>
+      <details><summary data-i="q3">ليه مش على Chrome Web Store؟</summary><p data-i="a3">لسه مرفوعتش هناك. التثبيت اليدوي بيدّيك نفس الإضافة بالظبط، وهنضيف روابط المتاجر لما تنزل.</p></details>
+      <details><summary data-i="q4">بتشتغل فين؟</summary><p data-i="a4">في خانات الكتابة العادية (input وtextarea) وأغلب المحررات. مش بتشتغل في صفحات <bdi dir="ltr">chrome://</bdi> ولا في محررات الكانفس زي Google Docs، ولا في خانات الإيميل والباسورد.</p></details>
+      <details><summary data-i="q5">إزاي أغيّر الاختصار؟</summary><p data-i="a5">دوس على أيقونة الإضافة ← <b>فتح الإعدادات</b> ← دوس على خانة الاختصار واضغط المجموعة الجديدة.</p></details>
+      <details><summary data-i="q6">فيه نسخة لـ Firefox أو الموبايل؟</summary><p data-i="a6">مش دلوقتي. Chrome على الموبايل مش بيدعم الإضافات، ونسخة Firefox لسه مش جاهزة.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="container foot-in">
+    <span data-i="foot_by">من تطوير إبراهيم · رخصة MIT</span>
+    <span class="foot-links">
+      <a href="https://github.com/shawady6/baddel" rel="noopener">GitHub</a>
+      <a href="https://github.com/shawady6/baddel/blob/main/PRIVACY.md" rel="noopener" data-i="foot_privacy">سياسة الخصوصية</a>
+      <a href="https://github.com/shawady6/baddel/issues" rel="noopener" data-i="foot_issues">بلّغ عن مشكلة</a>
+    </span>
+  </div>
+</footer>
+
+<script src="shared.js"></script>
+<script src="site.js"></script>
+</body>
+</html>
