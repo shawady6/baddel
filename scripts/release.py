@@ -32,7 +32,12 @@ def main():
                 z.write(path, arcname="baddel/" + os.path.relpath(path, EXT).replace(os.sep, "/"))
         z.writestr("baddel/README.txt", README)
 
-    print(f"built {out} (v{version})")
+    # served by GitHub Pages and via raw.githubusercontent, so no GitHub Release is needed
+    site_dl = os.path.join(ROOT, "docs", "downloads")
+    os.makedirs(site_dl, exist_ok=True)
+    shutil.copyfile(out, os.path.join(site_dl, "baddel.zip"))
+
+    print(f"built {out} (v{version}) and copied to docs/downloads/")
 
 
 README = """Baddel - Arabic <-> English keyboard fixer

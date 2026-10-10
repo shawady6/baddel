@@ -22,6 +22,14 @@ t("manifest is MV3", manifest.manifest_version === 3);
 t("docs/shared.js is in sync", fs.readFileSync(path.join(root, "docs/shared.js"), "utf8") ===
   fs.readFileSync(path.join(extDir, "shared.js"), "utf8"));
 
+// the downloadable zip must exist and carry the same version as the source
+try {
+  const zipPath = path.join(root, "docs/downloads/baddel.zip");
+  const { execFileSync } = require("child_process");
+  const inner = JSON.parse(execFileSync("unzip", ["-p", zipPath, "baddel/manifest.json"]).toString());
+  t("docs/downloads/baddel.zip version matches", inner.version === manifest.version);
+} catch (e) { t("docs/downloads/baddel.zip exists", false); }
+
 const A = require(path.join(extDir, "shared.js"));
 
 t("hgsghl -> السلام", A.convert("hgsghl") === "السلام");

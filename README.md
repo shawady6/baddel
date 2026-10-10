@@ -8,7 +8,7 @@
 **كتبت بلغة غلط؟ بدّل بضغطة.**
 
 [**Website / الموقع**](https://shawady6.github.io/baddel/) ·
-[**Download / تحميل**](https://github.com/shawady6/baddel/releases/latest/download/baddel.zip) ·
+[**Download / تحميل**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip) ·
 [Privacy](PRIVACY.md)
 
 </div>
@@ -29,7 +29,7 @@
 - خصوصية كاملة: مفيش أي طلبات شبكة ولا جمع بيانات.
 
 ### التثبيت (يدوي)
-1. حمّل `baddel.zip` من [آخر إصدار](https://github.com/shawady6/baddel/releases/latest/download/baddel.zip) وفك ضغطه في فولدر ثابت.
+1. حمّل `baddel.zip` من [هنا](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip) وفك ضغطه في فولدر ثابت.
 2. افتح `chrome://extensions` (أو `edge://extensions`) وفعّل **Developer mode**.
 3. دوس **Load unpacked** واختار فولدر `baddel`.
 4. ثبّت الأيقونة من قايمة الإضافات 🧩.
@@ -46,7 +46,7 @@
 - Private: no network requests, no data collection.
 
 ### Install (manual)
-1. Download `baddel.zip` from the [latest release](https://github.com/shawady6/baddel/releases/latest/download/baddel.zip) and extract it somewhere permanent.
+1. Download `baddel.zip` from the [here](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip) and extract it somewhere permanent.
 2. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
 3. Click **Load unpacked** and pick the `baddel` folder.
 
@@ -66,16 +66,19 @@ tests/       node tests for the conversion map and shortcut logic
 
 ```bash
 node tests/test_logic.js        # unit tests
-python3 scripts/release.py      # build dist/baddel.zip
+python3 scripts/release.py      # build dist/baddel.zip + docs/downloads/baddel.zip
 ```
 
 `docs/shared.js` is a copy of `extension/shared.js` so the website demo uses the exact same conversion map. `release.py` keeps them in sync, and the test suite fails if they differ.
 
-### Publishing a release
+### Publishing a new version
 ```bash
-git tag v1.3.0 && git push origin v1.3.0
+# bump "version" in extension/manifest.json, then:
+python3 scripts/release.py
+node tests/test_logic.js
+git add -A && git commit -m "Release vX.Y.Z" && git push
 ```
-The workflow in `.github/workflows/release.yml` builds `baddel.zip` and attaches it to the GitHub release, so the website's download link always points to the latest version.
+`docs/downloads/baddel.zip` is served by GitHub Pages, which is where the website's download button points.
 
 ## License
 [MIT](LICENSE)
