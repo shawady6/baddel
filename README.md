@@ -78,6 +78,7 @@
 ### حدود لازم تعرفها
 
 - مش بيشتغل في صفحات `chrome://` ولا Chrome Web Store ولا محررات الكانفس زي Google Docs ولا خانات الإيميل والباسورد.
+- **مش بيشتغل في شريط العنوان** (اللي فوق في المتصفح)، لأنه جزء من واجهة المتصفح نفسه مش من الصفحة، والمتصفحات بتمنع الإضافات منه. الحل: اكتب في أي خانة جوه صفحة (زي سيرش جوجل)، أو حوّل الكلام في خانة تانية وبعدين قصّه والصقه في الشريط.
 - الخريطة بين لوحة Arabic 101 ولوحة US QWERTY. الرموز النادرة مع Shift ممكن تحتاج مراجعة بعد التحويل.
 - في اتجاه عربي ← English، الحرفين «لا» بيتحولوا لـ `gh` (ل + ا) لأن نفس الحروف بتيجي من مفتاحين منفصلين.
 
@@ -129,6 +130,7 @@ To change the shortcut: click the extension icon → **Open settings** → click
 ### Limitations
 
 - Doesn't run on `chrome://` pages, the Chrome Web Store, canvas editors such as Google Docs, or email/password fields.
+- **Doesn't work in the browser's address bar (omnibox).** It's part of the browser's own UI rather than a web page, and browsers don't let extensions touch it. Workaround: type into any text field on a page (such as the Google search box), or convert the text in another field, then cut and paste it into the address bar.
 - The map is Arabic 101 ↔ US QWERTY. Rare shifted symbols may deserve a quick check after converting.
 - In the Arabic→English direction the lam-alef `لا` becomes `gh` (ل + ا), because the same characters can come from two separate keys.
 

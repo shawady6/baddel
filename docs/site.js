@@ -52,6 +52,8 @@
     a3: "It isn't published there yet. Manual installation gives you exactly the same extension, and store links will be added when it's available.",
     q4: "Where does it work?",
     a4: "In regular text fields (input and textarea) and most editors. It doesn't work on <bdi dir=\"ltr\">chrome://</bdi> pages, canvas editors like Google Docs, or email and password fields.",
+    q7: "Why doesn't it work in the browser's address bar?",
+    a7: "The address bar is part of the browser's own interface, not a web page, and browsers don't let extensions touch it for security reasons, so there's no way to make it work there. Workaround: type into any field on a page (such as the Google search box in a new tab), or convert the text in another field and then cut and paste it into the address bar.",
     q5: "How do I change the shortcut?",
     a5: "Click the extension icon → <b>Open settings</b> → click the shortcut box and press the new combination.",
     q6: "Is there a Firefox or mobile version?",
