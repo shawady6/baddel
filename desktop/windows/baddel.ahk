@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.0.0
+;@Ahk2Exe-SetVersion 1.0.1
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,7 +13,7 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.0.0"
+VERSION := "1.0.1"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
@@ -23,7 +23,8 @@ STARTUP_LNK := A_Startup "\Baddel.lnk"
 global gEnabled := true
 global gLastWord := true
 global gDirection := "auto"
-global gHotkey := ""
+global gHotkey := ""      ; as shown to the user, e.g. ^\
+global gHotkeyReg := ""   ; what is registered: physical key (scan code), e.g. ^sc02B
 global gDialog := ""
 
 ; ---------------------------------------------------------------------------
@@ -153,10 +154,11 @@ arToEn["ّ"] := "~"
 LoadSettings()
 if FileExist(A_ScriptDir "\baddel.ico")
     TraySetIcon(A_ScriptDir "\baddel.ico")
-if !SetHotkey(gHotkey) {
+if !SetHotkey(gHotkey, gHotkeyReg) {
     ; the saved shortcut is unusable: fall back to the default
     gHotkey := ""
-    SetHotkey(DEFAULT_HK)
+    gHotkeyReg := ""
+    SetHotkey(DEFAULT_HK, PhysicalForm(DEFAULT_HK))
 }
 BuildMenu()
 TrayTip("Select the wrong text and press " Friendly(gHotkey), APP " is running")
@@ -166,7 +168,7 @@ return
 ; Settings
 ; ---------------------------------------------------------------------------
 LoadSettings() {
-    global gEnabled, gLastWord, gDirection, gHotkey
+    global gEnabled, gLastWord, gDirection, gHotkey, gHotkeyReg
     gEnabled := IniRead(INI, "main", "enabled", "1") = "1"
     gLastWord := IniRead(INI, "main", "lastword", "1") = "1"
     gDirection := IniRead(INI, "main", "direction", "auto")
@@ -175,6 +177,9 @@ LoadSettings() {
     gHotkey := IniRead(INI, "main", "hotkey", DEFAULT_HK)
     if (gHotkey = "")
         gHotkey := DEFAULT_HK
+    gHotkeyReg := IniRead(INI, "main", "hotkeyreg", "")
+    if (gHotkeyReg = "")
+        gHotkeyReg := PhysicalForm(gHotkey)
 }
 
 SaveSettings() {
@@ -184,25 +189,44 @@ SaveSettings() {
         IniWrite(gLastWord ? "1" : "0", INI, "main", "lastword")
         IniWrite(gDirection, INI, "main", "direction")
         IniWrite(gHotkey, INI, "main", "hotkey")
+        IniWrite(gHotkeyReg, INI, "main", "hotkeyreg")
     }
 }
 
-; Registers the global hotkey. "$" makes it use the keyboard hook so the keys we
-; send ourselves can never re-trigger it.
-SetHotkey(hk) {
-    global gHotkey
-    old := gHotkey
-    if (hk = "")
+; "^\" -> "^sc02B": bind to the physical key instead of the character, so the
+; shortcut keeps working whichever keyboard language is active.
+PhysicalForm(hk) {
+    mods := RegExReplace(hk, "^([+^!#]*).*$", "$1")
+    key := SubStr(hk, StrLen(mods) + 1)
+    if (key = "")
+        return hk
+    try {
+        sc := GetKeySC(key)
+    } catch {
+        return hk
+    }
+    if (sc = 0)
+        return hk
+    return mods "sc" Format("{:03X}", sc)
+}
+
+; Registers the global hotkey (reg = physical form). "$" makes it use the keyboard
+; hook so the keys we send ourselves can never re-trigger it.
+SetHotkey(hk, reg) {
+    global gHotkey, gHotkeyReg
+    oldReg := gHotkeyReg
+    if (hk = "" || reg = "")
         return false
     try {
-        Hotkey("$" hk, Fix, "On")
+        Hotkey("$" reg, Fix, "On")
     } catch {
         return false
     }
-    if (old != "" && old != hk) {
-        try Hotkey("$" old, "Off")
+    if (oldReg != "" && oldReg != reg) {
+        try Hotkey("$" oldReg, "Off")
     }
     gHotkey := hk
+    gHotkeyReg := reg
     return true
 }
 
@@ -300,7 +324,7 @@ ToggleStartup() {
 }
 
 ChangeShortcut() {
-    global gHotkey, gDialog
+    global gHotkey, gHotkeyReg, gDialog
     if IsObject(gDialog) {
         gDialog.Show()
         return
@@ -308,14 +332,14 @@ ChangeShortcut() {
 
     ; nested functions are defined first; they use the variables declared below
     CloseDlg(*) {
-        global gHotkey, gDialog
-        try Hotkey("$" gHotkey, "On")
+        global gHotkeyReg, gDialog
+        try Hotkey("$" gHotkeyReg, "On")
         gDialog := ""
         g.Destroy()
     }
 
     SaveDlg(*) {
-        global gHotkey, gDialog
+        global gHotkeyReg, gDialog
         hk := hkc.Value
         if (hk = "") {
             msg.Value := "Press a shortcut first."
@@ -334,9 +358,10 @@ ChangeShortcut() {
                 return
             }
         }
-        try Hotkey("$" gHotkey, "On")
-        if !SetHotkey(hk) {
-            try Hotkey("$" gHotkey, "Off")
+        reg := PhysicalForm(hk)
+        try Hotkey("$" gHotkeyReg, "On")
+        if !SetHotkey(hk, reg) {
+            try Hotkey("$" gHotkeyReg, "Off")
             msg.Value := "Windows does not accept this shortcut."
             return
         }
@@ -344,10 +369,11 @@ ChangeShortcut() {
         BuildMenu()
         gDialog := ""
         g.Destroy()
+        TrayTip("Shortcut is now " Friendly(hk) ". Select some text and try it.", APP)
     }
 
     ; while the dialog is open the global hotkey must not fire
-    try Hotkey("$" gHotkey, "Off")
+    try Hotkey("$" gHotkeyReg, "Off")
 
     g := Gui("+AlwaysOnTop -MinimizeBox", APP " - Change shortcut")
     gDialog := g
@@ -395,6 +421,10 @@ Fix(*) {
     ; arrive as Ctrl+Shift+C and so on
     for k in ["Ctrl", "Shift", "Alt", "LWin", "RWin"]
         KeyWait(k, "T1")
+    mainKey := RegExReplace(A_ThisHotkey, "^[$~*<>^!+#]+")
+    if (mainKey != "") {
+        try KeyWait(mainKey, "T1")
+    }
     saved := ClipboardAll()
     try {
         DoFix()

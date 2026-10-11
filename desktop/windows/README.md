@@ -30,7 +30,17 @@ To get a standalone `baddel.exe`: right-click `baddel.ahk` → **Compile script*
 Tray menu: enable/disable, direction, change shortcut, start with Windows.
 Settings are stored in `%AppData%\Baddel\settings.ini`.
 
+## لو الاختصار وقف
+
+كليك يمين على الأيقونة ← **Change shortcut...** ← **Default** ← **Save**.
+ولو الأيقونة نفسها مش ظاهرة: امسح `%AppData%\Baddel\settings.ini` وشغّل البرنامج تاني.
+
+If the shortcut stops working: tray icon → **Change shortcut...** → **Default** → **Save**.
+If the app won't start properly, delete `%AppData%\Baddel\settings.ini` and run it again.
+
 ## Notes
+
+- The shortcut is bound to the physical key, so it works whichever keyboard language is active.
 
 - If the target app runs as **Administrator**, run Baddel as Administrator too.
 - It works by copying the selection, converting it and pasting it back, then restoring your
