@@ -30,6 +30,15 @@ try {
   t("docs/downloads/baddel.zip version matches", inner.version === manifest.version);
 } catch (e) { t("docs/downloads/baddel.zip exists", false); }
 
+// the Windows zip must exist and ship the same script as desktop/windows
+try {
+  const { execFileSync } = require("child_process");
+  const zipPath = path.join(root, "docs/downloads/baddel-windows.zip");
+  const inZip = execFileSync("unzip", ["-p", zipPath, "baddel-windows/baddel.ahk"]);
+  t("docs/downloads/baddel-windows.zip matches desktop/windows/baddel.ahk",
+    inZip.equals(fs.readFileSync(path.join(root, "desktop/windows/baddel.ahk"))));
+} catch (e) { t("docs/downloads/baddel-windows.zip exists", false); }
+
 const A = require(path.join(extDir, "shared.js"));
 
 t("hgsghl -> السلام", A.convert("hgsghl") === "السلام");
@@ -63,5 +72,7 @@ t("Alt+7 accepted", ok.status === "ok" && ok.shortcut.code === "Digit7");
 t("normalize garbage -> defaults",
   JSON.stringify(A.normalizeSettings({ shortcut: 5, direction: "x" })) === JSON.stringify(A.normalizeSettings(null)));
 t("normalize keeps disabled", A.normalizeSettings({ enabled: false }).enabled === false);
+
+require("./test_ahk.js")(t);
 
 process.exit(fail ? 1 : 0);

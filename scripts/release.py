@@ -37,7 +37,22 @@ def main():
     os.makedirs(site_dl, exist_ok=True)
     shutil.copyfile(out, os.path.join(site_dl, "baddel.zip"))
 
+    build_windows(site_dl)
     print(f"built {out} (v{version}) and copied to docs/downloads/")
+
+
+def build_windows(site_dl):
+    """desktop/windows -> docs/downloads/baddel-windows.zip (regenerates the tables first)."""
+    import subprocess
+    subprocess.run(["node", os.path.join(ROOT, "scripts", "gen_ahk.js")], check=True)
+    src = os.path.join(ROOT, "desktop", "windows")
+    out = os.path.join(site_dl, "baddel-windows.zip")
+    if os.path.exists(out):
+        os.remove(out)
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for name in ("baddel.ahk", "baddel.ico", "README.md"):
+            z.write(os.path.join(src, name), arcname="baddel-windows/" + name)
+    print(f"built {out}")
 
 
 README = """Baddel - Arabic <-> English keyboard fixer

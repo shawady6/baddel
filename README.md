@@ -75,10 +75,15 @@
 
 لتغيير الاختصار: دوس على أيقونة الإضافة ← **فتح الإعدادات** ← دوس على خانة الاختصار واضغط المجموعة الجديدة.
 
+### نسخة الويندوز (بتشتغل في أي برنامج)
+
+لو عاوز التحويل **في أي برنامج حتى شريط العنوان**، فيه برنامج صغير للويندوز بيقعد جنب الساعة وبيشتغل بنفس الاختصار:
+[**حمّل baddel-windows.zip**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip)، وثبّت [AutoHotkey v2](https://www.autohotkey.com) (مجاني)، ودبل كليك على `baddel.ahk`. التفاصيل في [desktop/windows](desktop/windows/README.md).
+
 ### حدود لازم تعرفها
 
 - مش بيشتغل في صفحات `chrome://` ولا Chrome Web Store ولا محررات الكانفس زي Google Docs ولا خانات الإيميل والباسورد.
-- **مش بيشتغل في شريط العنوان** (اللي فوق في المتصفح)، لأنه جزء من واجهة المتصفح نفسه مش من الصفحة، والمتصفحات بتمنع الإضافات منه. الحل: اكتب في أي خانة جوه صفحة (زي سيرش جوجل)، أو حوّل الكلام في خانة تانية وبعدين قصّه والصقه في الشريط.
+- **مش بيشتغل في شريط العنوان** (اللي فوق في المتصفح)، لأنه جزء من واجهة المتصفح نفسه مش من الصفحة، والمتصفحات بتمنع الإضافات منه. الحل: استخدم **نسخة الويندوز** فوق، أو اكتب في أي خانة جوه صفحة (زي سيرش جوجل)، أو حوّل الكلام في خانة تانية وبعدين قصّه والصقه في الشريط.
 - الخريطة بين لوحة Arabic 101 ولوحة US QWERTY. الرموز النادرة مع Shift ممكن تحتاج مراجعة بعد التحويل.
 - في اتجاه عربي ← English، الحرفين «لا» بيتحولوا لـ `gh` (ل + ا) لأن نفس الحروف بتيجي من مفتاحين منفصلين.
 
@@ -127,10 +132,15 @@ Baddel isn't on the Chrome Web Store yet, so it takes about two minutes to insta
 
 To change the shortcut: click the extension icon → **Open settings** → click the shortcut box and press the new combination.
 
+### Windows app (works in any program)
+
+Want it **everywhere, including the browser address bar**? There's a small Windows tray app with the same shortcut:
+[**Download baddel-windows.zip**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip), install [AutoHotkey v2](https://www.autohotkey.com) (free) and double-click `baddel.ahk`. Details in [desktop/windows](desktop/windows/README.md).
+
 ### Limitations
 
 - Doesn't run on `chrome://` pages, the Chrome Web Store, canvas editors such as Google Docs, or email/password fields.
-- **Doesn't work in the browser's address bar (omnibox).** It's part of the browser's own UI rather than a web page, and browsers don't let extensions touch it. Workaround: type into any text field on a page (such as the Google search box), or convert the text in another field, then cut and paste it into the address bar.
+- **Doesn't work in the browser's address bar (omnibox).** It's part of the browser's own UI rather than a web page, and browsers don't let extensions touch it. Workaround: use the **Windows app** above, or type into any text field on a page (such as the Google search box), or convert the text in another field, then cut and paste it into the address bar.
 - The map is Arabic 101 ↔ US QWERTY. Rare shifted symbols may deserve a quick check after converting.
 - In the Arabic→English direction the lam-alef `لا` becomes `gh` (ل + ا), because the same characters can come from two separate keys.
 
@@ -159,8 +169,9 @@ Full details in [PRIVACY.md](PRIVACY.md).
 
 ```text
 extension/   the browser extension — load this folder unpacked
+desktop/     the Windows tray app (AutoHotkey v2)
 docs/        the website (GitHub Pages, served from /docs) and the download
-scripts/     release.py → builds dist/baddel.zip and docs/downloads/baddel.zip
+scripts/     release.py → builds the zips in dist/ and docs/downloads/; gen_ahk.js → conversion tables for the Windows app
 tests/       node tests for the conversion map, shortcut logic and packaging
 ```
 

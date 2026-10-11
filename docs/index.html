@@ -22,6 +22,7 @@
   <nav aria-label="Main">
     <a href="#demo" data-i="nav_demo">جرّبها</a>
     <a href="#install" class="keep" data-i="nav_install">التثبيت</a>
+    <a href="#desktop" data-i="nav_desktop">ويندوز</a>
     <a href="#faq" data-i="nav_faq">أسئلة شائعة</a>
     <a href="https://github.com/shawady6/baddel" class="keep" rel="noopener">GitHub</a>
     <button type="button" class="lang" id="lang" aria-label="Language / اللغة">EN</button>
@@ -145,6 +146,39 @@
     </div>
   </section>
 
+  <section class="section container" id="desktop">
+    <h2 data-i="d_h">نسخة الويندوز: بتشتغل في أي برنامج</h2>
+    <p class="sub" data-i="d_sub">شريط العنوان، Word، واتساب، Notepad… أي مكان. برنامج صغير بيقعد جنب الساعة وبيحوّل النص المحدد بنفس الاختصار.</p>
+    <ol class="steps">
+      <li>
+        <div class="num">1</div>
+        <div class="body">
+          <h3 data-i="d1_t">حمّل وفك الضغط</h3>
+          <p data-i="d1_d">نزّل <code dir="ltr">baddel-windows.zip</code> وفك ضغطه.</p>
+          <a class="btn primary sm" href="downloads/baddel-windows.zip" download><span data-i="d_dl">حمّل نسخة الويندوز</span></a>
+        </div>
+      </li>
+      <li>
+        <div class="num">2</div>
+        <div class="body">
+          <h3 data-i="d2_t">ثبّت AutoHotkey v2 وشغّل الملف</h3>
+          <p data-i="d2_d">حمّل <a href="https://www.autohotkey.com" rel="noopener">AutoHotkey v2</a> (مجاني)، وبعدين دبل كليك على <code dir="ltr">baddel.ahk</code>. هتظهر أيقونة جنب الساعة. وتقدر تعمل منه <code dir="ltr">.exe</code> بكليك يمين ← <b>Compile script</b>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="num">3</div>
+        <div class="body">
+          <h3 data-i="d3_t">حدد واضغط</h3>
+          <p data-i="d3_d">حدد الكلام الغلط في أي برنامج واضغط <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>. ولو مفيش تحديد، بيحوّل آخر كلمة. ومن قايمة الأيقونة تغيّر الاختصار وتخلّيه يشتغل مع الويندوز.</p>
+        </div>
+      </li>
+    </ol>
+    <div class="tips">
+      <div class="tip"><h3 data-i="d_n1_t">لو البرنامج شغّال كـ Administrator</h3><p data-i="d_n1_d">شغّل بدّل كـ Administrator كمان، وإلا ويندوز هيمنع الكتابة الآلية.</p></div>
+      <div class="tip"><h3 data-i="d_n2_t">مش محتاج الإضافة معاه</h3><p data-i="d_n2_d">برنامج الويندوز بيغطي المتصفح كمان. لو شغّلت الاتنين، اختار لكل واحد اختصار مختلف.</p></div>
+    </div>
+  </section>
+
   <section class="section container" id="faq">
     <h2 data-i="faq_h">أسئلة شائعة</h2>
     <div class="faq">
@@ -152,7 +186,7 @@
       <details><summary data-i="q2">بتبعت كلامي لأي مكان؟</summary><p data-i="a2">لأ. مفيش أي طلبات شبكة في الكود، والإعدادات بس هي اللي بتتخزّن في المتصفح. الكود مفتوح وتقدر تراجعه بنفسك على GitHub.</p></details>
       <details><summary data-i="q3">ليه مش على Chrome Web Store؟</summary><p data-i="a3">لسه مرفوعتش هناك. التثبيت اليدوي بيدّيك نفس الإضافة بالظبط، وهنضيف روابط المتاجر لما تنزل.</p></details>
       <details><summary data-i="q4">بتشتغل فين؟</summary><p data-i="a4">في خانات الكتابة العادية (input وtextarea) وأغلب المحررات. مش بتشتغل في صفحات <bdi dir="ltr">chrome://</bdi> ولا في محررات الكانفس زي Google Docs، ولا في خانات الإيميل والباسورد.</p></details>
-      <details><summary data-i="q7">ليه مش بتشتغل في شريط العنوان بتاع المتصفح؟</summary><p data-i="a7">شريط العنوان جزء من واجهة المتصفح نفسه مش من صفحة ويب، والمتصفحات بتمنع الإضافات منه لأسباب أمان، فمفيش طريقة نخليها تشتغل فيه. الحل: اكتب في أي خانة جوه صفحة (زي سيرش جوجل في تاب جديد)، أو حوّل الكلام في خانة تانية وبعدين قصّه والصقه في الشريط.</p></details>
+      <details><summary data-i="q7">ليه مش بتشتغل في شريط العنوان بتاع المتصفح؟</summary><p data-i="a7">شريط العنوان جزء من واجهة المتصفح نفسه مش من صفحة ويب، والمتصفحات بتمنع الإضافات منه لأسباب أمان، فمفيش طريقة نخليها تشتغل فيه. الحل: استخدم <a href="#desktop">نسخة الويندوز</a> اللي بتشتغل في أي مكان، أو اكتب في أي خانة جوه صفحة (زي سيرش جوجل في تاب جديد)، أو حوّل الكلام في خانة تانية وبعدين قصّه والصقه في الشريط.</p></details>
       <details><summary data-i="q5">إزاي أغيّر الاختصار؟</summary><p data-i="a5">دوس على أيقونة الإضافة ← <b>فتح الإعدادات</b> ← دوس على خانة الاختصار واضغط المجموعة الجديدة.</p></details>
       <details><summary data-i="q6">فيه نسخة لـ Firefox أو الموبايل؟</summary><p data-i="a6">مش دلوقتي. Chrome على الموبايل مش بيدعم الإضافات، ونسخة Firefox لسه مش جاهزة.</p></details>
     </div>
