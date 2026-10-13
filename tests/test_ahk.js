@@ -64,7 +64,10 @@ module.exports = function run(t) {
   t("ahk: known examples", examples.every(([i, o]) => ahkConvert(i, "auto") === o));
 
   // ---- cheap structural sanity for a file we can't execute here
-  const code = src.replace(/;.*$/gm, "").replace(/"(?:[^"`]|`[\s\S]|"")*"/g, '""');
+  // per line: drop string literals first (they may contain ";" or brackets), then comments
+  const code = src.split("\n")
+    .map((l) => l.replace(/"(?:[^"`\n]|`.|"")*"/g, '""').replace(/;.*$/, ""))
+    .join("\n");
   const count_ = (re_) => (code.match(re_) || []).length;
   t("ahk: braces balanced", count_(/\{/g) === count_(/\}/g));
   t("ahk: parentheses balanced", count_(/\(/g) === count_(/\)/g));

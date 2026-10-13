@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.0.1
+;@Ahk2Exe-SetVersion 1.1.0
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,7 +13,7 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.0.1"
+VERSION := "1.1.0"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
@@ -256,7 +256,7 @@ Friendly(hk) {
 ; Tray menu
 ; ---------------------------------------------------------------------------
 BuildMenu() {
-    global gEnabled, gLastWord, gDirection, gHotkey
+    global gEnabled, gDirection, gHotkey
     m := A_TrayMenu
     m.Delete()
 
@@ -268,10 +268,6 @@ BuildMenu() {
     m.Add("Enabled", (*) => Toggle("enabled"))
     if gEnabled
         m.Check("Enabled")
-
-    m.Add("Convert last word if nothing is selected", (*) => Toggle("lastword"))
-    if gLastWord
-        m.Check("Convert last word if nothing is selected")
 
     dm := Menu()
     dm.Add("Auto-detect", (*) => SetDirection("auto"))
@@ -285,23 +281,19 @@ BuildMenu() {
         dm.Check("English to Arabic")
     m.Add("Direction", dm)
 
-    m.Add("Change shortcut...", (*) => ChangeShortcut())
+    m.Add("Settings...", (*) => OpenSettings())
     m.Add()
-    m.Add("Start with Windows", (*) => ToggleStartup())
-    if FileExist(STARTUP_LNK)
-        m.Check("Start with Windows")
     m.Add("Open website", (*) => Run(SITE))
     m.Add("Exit", (*) => ExitApp())
 
+    m.Default := "Settings..."
+    m.ClickCount := 1
     A_IconTip := APP " - " Friendly(gHotkey)
 }
 
 Toggle(what) {
-    global gEnabled, gLastWord
-    if (what = "enabled")
-        gEnabled := !gEnabled
-    else
-        gLastWord := !gLastWord
+    global gEnabled
+    gEnabled := !gEnabled
     SaveSettings()
     BuildMenu()
 }
@@ -313,24 +305,47 @@ SetDirection(d) {
     BuildMenu()
 }
 
-ToggleStartup() {
+SetStartup(on) {
     try {
-        if FileExist(STARTUP_LNK)
-            FileDelete(STARTUP_LNK)
-        else
+        exists := FileExist(STARTUP_LNK)
+        if (on && !exists)
             FileCreateShortcut(A_ScriptFullPath, STARTUP_LNK, A_ScriptDir, , APP)
+        else if (!on && exists)
+            FileDelete(STARTUP_LNK)
     }
-    BuildMenu()
 }
 
-ChangeShortcut() {
-    global gHotkey, gHotkeyReg, gDialog
+; Returns an error message for an unusable shortcut, or "" when it is fine.
+HotkeyError(hk) {
+    if (hk = "")
+        return "Press a shortcut first."
+    mods := RegExReplace(hk, "^([+^!#]*).*$", "$1")
+    if !(InStr(mods, "^") || InStr(mods, "!") || InStr(mods, "#"))
+        return "Add Ctrl, Alt or Win to the shortcut."
+    low := StrLower(hk)
+    for r in ["^c", "^v", "^x", "^z", "^y", "^a", "^s", "^t", "^w", "^n", "^+t", "^+n", "^+w", "!f4"] {
+        if (low = r)
+            return "This shortcut is reserved by Windows or the browser."
+    }
+    return ""
+}
+
+; ---------------------------------------------------------------------------
+; Settings window
+; ---------------------------------------------------------------------------
+OpenSettings(*) {
+    global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog
     if IsObject(gDialog) {
         gDialog.Show()
         return
     }
 
-    ; nested functions are defined first; they use the variables declared below
+    ; nested functions come first; they use the controls created below
+    Preview(*) {
+        mode := r1.Value ? "auto" : (r2.Value ? "ar2en" : "en2ar")
+        outBox.Value := Convert(inBox.Value, mode)
+    }
+
     CloseDlg(*) {
         global gHotkeyReg, gDialog
         try Hotkey("$" gHotkeyReg, "On")
@@ -339,64 +354,118 @@ ChangeShortcut() {
     }
 
     SaveDlg(*) {
-        global gHotkeyReg, gDialog
+        global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog
         hk := hkc.Value
-        if (hk = "") {
-            msg.Value := "Press a shortcut first."
+        err := HotkeyError(hk)
+        if (err != "") {
+            msg.Value := err
             return
         }
-        mods := RegExReplace(hk, "^([+^!#]*).*$", "$1")
-        if !(InStr(mods, "^") || InStr(mods, "!") || InStr(mods, "#")) {
-            msg.Value := "Add Ctrl, Alt or Win to the shortcut."
-            return
-        }
-        reserved := ["^c", "^v", "^x", "^z", "^y", "^a", "^s", "^t", "^w", "^n", "^+t", "^+n", "^+w", "!f4"]
-        low := StrLower(hk)
-        for r in reserved {
-            if (low = r) {
-                msg.Value := "This shortcut is reserved by Windows or the browser."
+        try Hotkey("$" gHotkeyReg, "On")
+        if (hk != gHotkey) {
+            if !SetHotkey(hk, PhysicalForm(hk)) {
+                try Hotkey("$" gHotkeyReg, "Off")
+                msg.Value := "Windows does not accept this shortcut."
                 return
             }
         }
-        reg := PhysicalForm(hk)
-        try Hotkey("$" gHotkeyReg, "On")
-        if !SetHotkey(hk, reg) {
-            try Hotkey("$" gHotkeyReg, "Off")
-            msg.Value := "Windows does not accept this shortcut."
-            return
-        }
+        gEnabled := cbOn.Value = 1
+        gLastWord := cbLast.Value = 1
+        gDirection := r1.Value ? "auto" : (r2.Value ? "ar2en" : "en2ar")
+        SetStartup(cbStart.Value = 1)
         SaveSettings()
         BuildMenu()
         gDialog := ""
         g.Destroy()
-        TrayTip("Shortcut is now " Friendly(hk) ". Select some text and try it.", APP)
+        TrayTip("Shortcut: " Friendly(gHotkey) ". Select some text and try it.", APP " - saved")
     }
 
-    ; while the dialog is open the global hotkey must not fire
+    ; the global hotkey must not fire while the shortcut is being recorded
     try Hotkey("$" gHotkeyReg, "Off")
 
-    g := Gui("+AlwaysOnTop -MinimizeBox", APP " - Change shortcut")
+    g := Gui("+AlwaysOnTop -MinimizeBox -MaximizeBox", APP " - Settings")
     gDialog := g
+    g.BackColor := "F4F5FB"
+    g.MarginX := 16
+    g.MarginY := 10
     g.SetFont("s10", "Segoe UI")
-    g.Add("Text", "w320", "Click the box, then press the new shortcut.`nIt must include Ctrl, Alt or Win.")
-    hkc := g.Add("Hotkey", "w320", gHotkey)
-    msg := g.Add("Text", "w320 h24 cRed", "")
-    bSave := g.Add("Button", "Default w100", "Save")
-    bDef := g.Add("Button", "x+8 w100", "Default")
-    bCancel := g.Add("Button", "x+8 w100", "Cancel")
-    bSave.OnEvent("Click", SaveDlg)
+
+    ; header band with the app icon
+    g.Add("Text", "x0 y0 w460 h76 Background4F46E5", "")
+    if FileExist(A_ScriptDir "\baddel.ico")
+        g.Add("Picture", "x18 y16 w44 h44 BackgroundTrans", A_ScriptDir "\baddel.ico")
+    g.SetFont("s16 bold cFFFFFF", "Segoe UI")
+    g.Add("Text", "x76 y12 w360 BackgroundTrans", "Baddel  ·  بدّل")
+    g.SetFont("s9 norm cFFFFFF", "Segoe UI")
+    g.Add("Text", "x76 y44 w360 BackgroundTrans", "Fix text typed in the wrong keyboard language")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+
+    ; shortcut
+    g.SetFont("s10 bold", "Segoe UI")
+    g.Add("Text", "xm y+20 w428", "Shortcut")
+    g.SetFont("s9 norm c5D6980", "Segoe UI")
+    g.Add("Text", "xm y+2 w428", "Click the box, then press the new keys (Ctrl, Alt or Win + a key).")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    hkc := g.Add("Hotkey", "xm y+8 w300 h28", gHotkey)
+    bDef := g.Add("Button", "x+10 yp w118 h28", "Default")
     bDef.OnEvent("Click", (*) => hkc.Value := DEFAULT_HK)
+    g.SetFont("s9 norm cC0392B", "Segoe UI")
+    msg := g.Add("Text", "xm y+4 w428 h20", "")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+
+    ; direction
+    g.SetFont("s10 bold", "Segoe UI")
+    g.Add("Text", "xm y+8 w428", "Direction")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    r1 := g.Add("Radio", "xm y+6 Group", "Auto-detect")
+    r2 := g.Add("Radio", "x+16 yp", "Arabic → English")
+    r3 := g.Add("Radio", "x+16 yp", "English → Arabic")
+    r1.Value := (gDirection = "auto") ? 1 : 0
+    r2.Value := (gDirection = "ar2en") ? 1 : 0
+    r3.Value := (gDirection = "en2ar") ? 1 : 0
+    r1.OnEvent("Click", Preview)
+    r2.OnEvent("Click", Preview)
+    r3.OnEvent("Click", Preview)
+
+    ; options
+    g.SetFont("s10 bold", "Segoe UI")
+    g.Add("Text", "xm y+16 w428", "Options")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    cbOn := g.Add("Checkbox", "xm y+6 w428", "Enabled")
+    cbOn.Value := gEnabled ? 1 : 0
+    cbLast := g.Add("Checkbox", "xm y+4 w428", "Convert the last word when nothing is selected")
+    cbLast.Value := gLastWord ? 1 : 0
+    cbStart := g.Add("Checkbox", "xm y+4 w428", "Start with Windows")
+    cbStart.Value := FileExist(STARTUP_LNK) ? 1 : 0
+
+    ; live preview
+    g.SetFont("s10 bold", "Segoe UI")
+    g.Add("Text", "xm y+16 w428", "Try it")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    inBox := g.Add("Edit", "xm y+6 w208 r3", "hgsghl ugd;l")
+    outBox := g.Add("Edit", "x+12 yp w208 r3 ReadOnly", "")
+    inBox.OnEvent("Change", Preview)
+    Preview()
+
+    ; buttons
+    bSave := g.Add("Button", "xm+228 y+20 w100 h32 Default", "Save")
+    bCancel := g.Add("Button", "x+8 yp w100 h32", "Cancel")
+    bSave.OnEvent("Click", SaveDlg)
     bCancel.OnEvent("Click", CloseDlg)
     g.OnEvent("Close", CloseDlg)
     g.OnEvent("Escape", CloseDlg)
-    g.Show()
+
+    g.SetFont("s8 norm c8A94A8", "Segoe UI")
+    g.Add("Text", "xm y+14 w428", APP " " VERSION "  ·  shawady6.github.io/baddel")
+    g.Show("w460")
 }
 
 ; ---------------------------------------------------------------------------
 ; Conversion
 ; ---------------------------------------------------------------------------
-Convert(text) {
-    mode := gDirection
+Convert(text, mode := "") {
+    if (mode = "")
+        mode := gDirection
     if (mode = "auto") {
         ar := StrLen(RegExReplace(text, "[^\x{0600}-\x{06FF}]"))
         la := StrLen(RegExReplace(text, "[^A-Za-z]"))

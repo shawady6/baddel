@@ -15,7 +15,7 @@ listens for a global shortcut (default `Ctrl+Shift+X`).
 **عايز ملف `.exe` من غير ما تحتاج AutoHotkey على الأجهزة التانية؟**
 كليك يمين على `baddel.ahk` ← **Compile script**، وبيطلع لك `baddel.exe` (جاي مع AutoHotkey).
 
-قايمة الأيقونة: تشغيل/إيقاف، اتجاه التحويل، تغيير الاختصار، التشغيل مع الويندوز.
+دبل كليك على الأيقونة بتفتح نافذة **Settings**: تغيير الاختصار، اتجاه التحويل، تجربة مباشرة، والتشغيل مع الويندوز.
 الإعدادات بتتحفظ في `%AppData%\Baddel\settings.ini`.
 
 ## Usage
@@ -27,15 +27,15 @@ listens for a global shortcut (default `Ctrl+Shift+X`).
 
 To get a standalone `baddel.exe`: right-click `baddel.ahk` → **Compile script**.
 
-Tray menu: enable/disable, direction, change shortcut, start with Windows.
+Double-click the tray icon to open **Settings**: shortcut, direction, a live try-it box, and start with Windows.
 Settings are stored in `%AppData%\Baddel\settings.ini`.
 
 ## لو الاختصار وقف
 
-كليك يمين على الأيقونة ← **Change shortcut...** ← **Default** ← **Save**.
+كليك يمين على الأيقونة ← **Settings...** ← **Default** ← **Save**.
 ولو الأيقونة نفسها مش ظاهرة: امسح `%AppData%\Baddel\settings.ini` وشغّل البرنامج تاني.
 
-If the shortcut stops working: tray icon → **Change shortcut...** → **Default** → **Save**.
+If the shortcut stops working: tray icon → **Settings...** → **Default** → **Save**.
 If the app won't start properly, delete `%AppData%\Baddel\settings.ini` and run it again.
 
 ## Notes
