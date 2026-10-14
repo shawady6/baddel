@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.1.0
+;@Ahk2Exe-SetVersion 1.1.1
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,7 +13,7 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.1.0"
+VERSION := "1.1.1"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
@@ -22,6 +22,8 @@ STARTUP_LNK := A_Startup "\Baddel.lnk"
 
 global gEnabled := true
 global gLastWord := true
+global gUndoOut := ""
+global gUndoOrig := ""
 global gDirection := "auto"
 global gHotkey := ""      ; as shown to the user, e.g. ^\
 global gHotkeyReg := ""   ; what is registered: physical key (scan code), e.g. ^sc02B
@@ -511,9 +513,12 @@ CopySelection() {
 }
 
 DoFix() {
+    global gUndoOut, gUndoOrig
     madeSelection := false
     sel := CopySelection()
     if (sel = "") {
+        if TryUndo()
+            return
         if !gLastWord
             return
         sel := SelectLastToken()
@@ -544,10 +549,38 @@ DoFix() {
     Send("^v")
     Sleep(150)
 
-    ; keep the result selected so pressing the shortcut again flips it back
+    ; the caret stays after the result (nothing left selected, so typing never
+    ; overwrites it); pressing the shortcut again right away undoes it
+    gUndoOut := out
+    gUndoOrig := sel
+}
+
+; Pressing the shortcut again with nothing selected, right after a conversion:
+; select the text we just pasted and, if it is still intact, put the original back.
+TryUndo() {
+    global gUndoOut, gUndoOrig
+    if (gUndoOut = "")
+        return false
+    out := gUndoOut
+    orig := gUndoOrig
+    gUndoOut := ""
+    gUndoOrig := ""
     n := StrLen(StrReplace(out, "`r`n", "`n"))
-    if (n > 0 && n < 2000)
-        Send("+{Left " n "}")
+    if (n < 1 || n > 2000)
+        return false
+    Send("+{Left " n "}")
+    Sleep(30)
+    cur := CopySelection()
+    if (cur != "" && StrReplace(cur, "`r`n", "`n") == StrReplace(out, "`r`n", "`n")) {
+        A_Clipboard := orig
+        if !ClipWait(0.5)
+            return true
+        Send("^v")
+        Sleep(150)
+        return true
+    }
+    Send("{Right}")
+    return false
 }
 
 ; With nothing selected: select the last whitespace-delimited word before the
