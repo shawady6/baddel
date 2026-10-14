@@ -203,3 +203,10 @@ kbd {
   .caret { animation: none; }
 }
 .btn.primary.win { background: linear-gradient(135deg, #0f766e, #0891b2); }
+
+.cards.three { grid-template-columns: repeat(3, 1fr); }
+.cards.two { grid-template-columns: repeat(2, 1fr); }
+.card .actions { margin: 14px 0; }
+.card .mini { margin: 0; padding-inline-start: 20px; color: var(--muted); font-size: 14.5px; display: grid; gap: 6px; }
+.card .tabs { margin-top: 14px; }
+@media (max-width: 860px) { .cards.three, .cards.two { grid-template-columns: 1fr; } }

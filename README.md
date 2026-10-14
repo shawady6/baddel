@@ -1,192 +1,89 @@
 <div align="center">
 
-<img src="docs/assets/og.png" alt="Baddel · بدّل — Arabic ↔ English keyboard fixer" width="760">
+<img src="docs/assets/og.png" alt="Baddel · بدّل" width="720">
 
-<br>
+[![Windows](https://img.shields.io/badge/Windows-baddel.exe-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe)
+[![Extension](https://img.shields.io/badge/Chrome_%C2%B7_Edge-baddel.zip-4f46e5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip)
+[![Website](https://img.shields.io/badge/Website-live_demo-2563eb?style=for-the-badge)](https://shawady6.github.io/baddel/)
 
-[![Download](https://img.shields.io/badge/Download-baddel.zip-4f46e5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip)
-[![Windows](https://img.shields.io/badge/Windows_app-baddel.exe-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe)
-[![Website](https://img.shields.io/badge/Website-live_demo-2563eb?style=for-the-badge&logo=githubpages&logoColor=white)](https://shawady6.github.io/baddel/)
-
-![Version](https://img.shields.io/badge/version-1.3.1-4f46e5)
-![Manifest](https://img.shields.io/badge/Manifest-V3-2563eb)
-![Browsers](https://img.shields.io/badge/Chrome%20%C2%B7%20Edge%20%C2%B7%20Brave%20%C2%B7%20Opera-supported-16a34a)
-![Privacy](https://img.shields.io/badge/data%20collected-none-16a34a)
-[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
-
-**[العربية](#arabic) · [English](#english) · [Website / الموقع](https://shawady6.github.io/baddel/) · [Privacy](PRIVACY.md)**
-
-<br>
-
-<img src="docs/assets/demo.gif" alt="Demo: hgsghl ugd;l becomes السلام عليكم with Ctrl+Shift+X" width="560">
+<img src="docs/assets/demo.gif" alt="hgsghl ugd;l becomes السلام عليكم" width="520">
 
 </div>
-
----
-
-<a name="arabic"></a>
 
 <div dir="rtl" align="right">
 
 ## بدّل · Baddel
 
-**كتبت عربي وانت على كيبورد إنجليزي؟ بدّل بضغطة.**
-
-إضافة مجانية ومفتوحة المصدر لمتصفحات Chromium (Chrome وEdge وBrave وOpera) بتحوّل الكلام اللي اتكتب بلغة الكيبورد الغلط بين العربي والإنجليزي، من غير ما تمسح وتكتب من الأول.
+**كتبت عربي وانت على كيبورد إنجليزي؟ حدد الكلام واضغط `Ctrl+Shift+X`.**
 
 | اللي اتكتب | بعد الضغط |
 |:--|:--|
 | `hgsghl ugd;l` | السلام عليكم |
-| `lvpfh` | مرحبا |
 | `اثممخ` | `hello` |
 
-### المميزات
+ضغطة تانية بترجّع الكلام زي ما كان. ولو مفيش تحديد، بيحوّل آخر كلمة.
 
-- **اختصار واحد** (الافتراضي `Ctrl+Shift+X`) بيحوّل النص المحدد، أو آخر كلمة قبل المؤشر لو مفيش تحديد.
-- **تراجع بنفس الضغطة:** بعد التحويل النص بيفضل متحدد، وضغطة تانية بترجّعه زي ما كان.
-- **بيشتغل مهما كانت لغة الكيبورد الحالية،** لأن الاختصار بيعتمد على مفتاح الكيبورد نفسه.
-- **صفحة إعدادات:** تسجيل اختصار جديد، واتجاه التحويل (تلقائي أو عربي ← English أو العكس)، وتشغيل وإيقاف، وصندوق تجربة مباشر.
-- **خصوصية كاملة:** مفيش أي طلبات شبكة ولا جمع بيانات. الكود قدامك وتقدر تراجعه.
+### حمّل واشتغل
 
-### الشكل
+**🪟 نسخة الويندوز** (بتشتغل في أي برنامج حتى شريط العنوان)
+1. [حمّل baddel.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) وشغّله.
+2. لو ويندوز طلّع تحذير: **More info ← Run anyway**.
+3. دبل كليك على الأيقونة جنب الساعة للإعدادات.
 
-<table>
-<tr>
-<td align="center"><img src="docs/assets/options.png" alt="صفحة الإعدادات" width="520"><br><sub>صفحة الإعدادات</sub></td>
-<td align="center"><img src="docs/assets/popup.png" alt="النافذة المنبثقة" width="260"><br><sub>النافذة المنبثقة</sub></td>
-</tr>
-</table>
+**🧩 إضافة المتصفح** (Chrome وEdge وBrave وOpera)
+1. [حمّل baddel.zip](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip) وفك الضغط في فولدر ثابت.
+2. افتح `chrome://extensions` (أو `edge://extensions`) وفعّل **Developer mode**.
+3. دوس **Load unpacked** واختار الفولدر.
 
-### التثبيت
+### ملحوظات
 
-الإضافة لسه مش على متجر Chrome، فبتتثبّت يدويا في دقيقتين:
-
-1. **[حمّل baddel.zip](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip)** وفك ضغطه في مكان ثابت (المتصفح بيقرا الإضافة من الفولدر ده، فمتمسحوش).
-2. افتح `chrome://extensions` (أو `edge://extensions`) وفعّل **Developer mode** من فوق على اليمين.
-3. دوس **Load unpacked** واختار فولدر `baddel`.
-4. ثبّت الأيقونة من قايمة الإضافات 🧩.
-
-> شرح بالصور وزرار نسخ الرابط على [الموقع](https://shawady6.github.io/baddel/#install).
-
-### الاستخدام
-
-1. اكتب أي حاجة في أي خانة نص، وحدد الكلام اللي اتكتب غلط.
-2. اضغط **`Ctrl+Shift+X`**.
-3. لو مفيش تحديد، هيحوّل آخر كلمة قبل المؤشر.
-
-لتغيير الاختصار: دوس على أيقونة الإضافة ← **فتح الإعدادات** ← دوس على خانة الاختصار واضغط المجموعة الجديدة.
-
-### نسخة الويندوز (بتشتغل في أي برنامج)
-
-لو عاوز التحويل **في أي برنامج حتى شريط العنوان**، فيه برنامج صغير للويندوز بيقعد جنب الساعة وبيشتغل بنفس الاختصار:
-[**حمّل baddel.exe**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) ودبل كليك عليه (من غير تثبيت). لو ويندوز طلّع تحذير دوس More info ← Run anyway. وفيه كمان [نسخة ZIP](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip) بتحتاج [AutoHotkey v2](https://www.autohotkey.com). التفاصيل في [desktop/windows](desktop/windows/README.md).
-
-### حدود لازم تعرفها
-
-- مش بيشتغل في صفحات `chrome://` ولا Chrome Web Store ولا محررات الكانفس زي Google Docs ولا خانات الإيميل والباسورد.
-- **مش بيشتغل في شريط العنوان** (اللي فوق في المتصفح)، لأنه جزء من واجهة المتصفح نفسه مش من الصفحة، والمتصفحات بتمنع الإضافات منه. الحل: استخدم **نسخة الويندوز** فوق، أو اكتب في أي خانة جوه صفحة (زي سيرش جوجل)، أو حوّل الكلام في خانة تانية وبعدين قصّه والصقه في الشريط.
-- الخريطة بين لوحة Arabic 101 ولوحة US QWERTY. الرموز النادرة مع Shift ممكن تحتاج مراجعة بعد التحويل.
-- في اتجاه عربي ← English، الحرفين «لا» بيتحولوا لـ `gh` (ل + ا) لأن نفس الحروف بتيجي من مفتاحين منفصلين.
+- الإضافة مش بتشتغل في شريط العنوان (المتصفح بيمنعها)، استخدم نسخة الويندوز.
+- مفيش أي اتصال بالإنترنت ولا جمع بيانات. التفاصيل في [PRIVACY.md](PRIVACY.md).
+- لو لقيت مشكلة: [بلّغ هنا](https://github.com/shawady6/baddel/issues).
 
 </div>
 
 ---
 
-<a name="english"></a>
-
 ## English
 
-**Typed Arabic on an English keyboard (or the other way round)? Fix it in one keypress.**
+**Typed Arabic on an English keyboard (or the reverse)? Select the text and press `Ctrl+Shift+X`.**
 
-Baddel is a free, open-source extension for Chromium browsers (Chrome, Edge, Brave, Opera) that converts text typed in the wrong keyboard layout between Arabic and English, so you never have to delete and retype.
+Press it again to undo. With nothing selected, it converts the last word.
 
-| You typed | After the shortcut |
-|:--|:--|
-| `hgsghl ugd;l` | السلام عليكم |
-| `lvpfh` | مرحبا |
-| `اثممخ` | `hello` |
+### Download
 
-### Features
+**🪟 Windows app** (works in any program, even the browser address bar)
+1. [Download baddel.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) and run it.
+2. If Windows shows a warning: **More info → Run anyway** (the app isn't code-signed).
+3. Double-click the tray icon for settings.
 
-- **One shortcut** (default `Ctrl+Shift+X`) converts the selection, or the word before the caret when nothing is selected.
-- **Undo with the same key:** the result stays selected, so pressing the shortcut again flips it back.
-- **Layout independent:** the shortcut is matched by physical key, so it works whichever language is active.
-- **Settings page:** shortcut recorder, conversion direction (auto, Arabic→English, English→Arabic), on/off switch and a live preview.
-- **Private by design:** no network requests, no analytics, no data collection. Read the code yourself.
+**🧩 Browser extension** (Chrome, Edge, Brave, Opera)
+1. [Download baddel.zip](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip) and extract it to a permanent folder.
+2. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
+3. Click **Load unpacked** and choose the folder.
 
-### Install (manual)
+### Notes
 
-Baddel isn't on the Chrome Web Store yet, so it takes about two minutes to install:
-
-1. **[Download baddel.zip](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip)** and extract it somewhere permanent (the browser loads the extension from that folder, so don't delete it).
-2. Open `chrome://extensions` (or `edge://extensions`) and switch on **Developer mode**.
-3. Click **Load unpacked** and choose the `baddel` folder.
-4. Pin the icon from the puzzle 🧩 menu.
-
-> A step-by-step guide with a copy button for the address is on the [website](https://shawady6.github.io/baddel/#install).
-
-### Usage
-
-1. Type in any text field, then select the text you typed in the wrong language.
-2. Press **`Ctrl+Shift+X`**.
-3. With nothing selected, the word before the caret is converted.
-
-To change the shortcut: click the extension icon → **Open settings** → click the shortcut box and press the new combination.
-
-### Windows app (works in any program)
-
-Want it **everywhere, including the browser address bar**? There's a small Windows tray app with the same shortcut:
-[**Download baddel.exe**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) and double-click it (no installation). If Windows warns about an unsigned app, click More info → Run anyway. A [ZIP version](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip) that needs [AutoHotkey v2](https://www.autohotkey.com) is also available. Details in [desktop/windows](desktop/windows/README.md).
-
-### Limitations
-
-- Doesn't run on `chrome://` pages, the Chrome Web Store, canvas editors such as Google Docs, or email/password fields.
-- **Doesn't work in the browser's address bar (omnibox).** It's part of the browser's own UI rather than a web page, and browsers don't let extensions touch it. Workaround: use the **Windows app** above, or type into any text field on a page (such as the Google search box), or convert the text in another field, then cut and paste it into the address bar.
-- The map is Arabic 101 ↔ US QWERTY. Rare shifted symbols may deserve a quick check after converting.
-- In the Arabic→English direction the lam-alef `لا` becomes `gh` (ل + ا), because the same characters can come from two separate keys.
-
-### Roadmap
-
-- [ ] Microsoft Edge Add-ons listing
-- [ ] Chrome Web Store listing
-- [ ] Firefox build
-- [ ] More keyboard layouts (Arabic 102, French AZERTY)
-
-Ideas and bug reports are welcome in [Issues](https://github.com/shawady6/baddel/issues).
-
-### Permissions, explained
-
-| Permission | Why it's needed |
-|:--|:--|
-| Access to all sites | To listen for the shortcut and edit the text field you're typing in, on any website. Nothing happens until you press the shortcut. |
-| `storage` | To save your settings (shortcut, direction, on/off). |
-| `scripting` | To attach to tabs that were already open when the extension was installed. |
-
-Full details in [PRIVACY.md](PRIVACY.md).
+- The extension can't work in the address bar (browsers block it); use the Windows app there.
+- No network access, no data collection. See [PRIVACY.md](PRIVACY.md).
+- Found a problem? [Open an issue](https://github.com/shawady6/baddel/issues).
 
 ---
 
-## Development
+<details>
+<summary>For developers</summary>
 
 ```text
-extension/   the browser extension — load this folder unpacked
-desktop/     the Windows tray app (AutoHotkey v2)
-docs/        the website (GitHub Pages, served from /docs) and the download
-scripts/     release.py → builds the zips in dist/ and docs/downloads/; gen_ahk.js → conversion tables for the Windows app
-tests/       node tests for the conversion map, shortcut logic and packaging
+extension/   browser extension (load unpacked)
+desktop/     Windows app (AutoHotkey v2) - see desktop/windows/README.md
+docs/        website (GitHub Pages) and the downloads
+scripts/     release.py (builds zips), gen_ahk.js (conversion tables)
+tests/       node tests/test_logic.js
 ```
 
-```bash
-node tests/test_logic.js      # run the tests
-python3 scripts/release.py    # build the zip and sync docs/shared.js
-```
+`docs/downloads/baddel.exe` is built on Windows (right-click `baddel.ahk` → Compile script) and must be replaced whenever `baddel.ahk` changes. Release: bump `extension/manifest.json`, run `python3 scripts/release.py` and `node tests/test_logic.js`, commit, push.
 
-`docs/shared.js` is a copy of `extension/shared.js` so the website demo uses exactly the same conversion map. `release.py` keeps them in sync and the tests fail if they differ.
-
-`docs/downloads/baddel.exe` is built on Windows (right-click `baddel.ahk` → Compile script) and must be rebuilt and replaced whenever `baddel.ahk` changes.
-
-**Releasing a new version:** bump `version` in `extension/manifest.json`, run `python3 scripts/release.py` and `node tests/test_logic.js`, then commit and push. The website's download button serves `docs/downloads/baddel.zip`.
-
-## License
+</details>
 
 [MIT](LICENSE) © Ibrahim
