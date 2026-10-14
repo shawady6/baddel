@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.2.1
+;@Ahk2Exe-SetVersion 1.2.2
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,12 +13,13 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.2.1"
+VERSION := "1.2.2"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
 INI := SETTINGS_DIR "\settings.ini"
-STARTUP_LNK := A_Startup "\Baddel.lnk"
+STARTUP_LNK := A_Startup "\Baddel.lnk"   ; old versions used this shortcut
+RUN_KEY := "HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
 
 global gEnabled := true
 global gLastWord := true
@@ -155,6 +156,9 @@ arToEn["ّ"] := "~"
 ; Start-up
 ; ---------------------------------------------------------------------------
 LoadSettings()
+; keep "Start with Windows" working if the file was moved or came from an old shortcut
+if (StartupOn() || FileExist(STARTUP_LNK))
+    SetStartup(true, true)
 if FileExist(A_ScriptDir "\baddel.ico")
     TraySetIcon(A_ScriptDir "\baddel.ico")
 if !SetHotkey(gHotkey, gHotkeyReg) {
@@ -310,15 +314,34 @@ SetDirection(d) {
     BuildMenu()
 }
 
-SetStartup(on) {
-    try {
-        exists := FileExist(STARTUP_LNK)
-        if (on && !exists)
-            FileCreateShortcut(A_ScriptFullPath, STARTUP_LNK, A_ScriptDir, , APP)
-        else if (!on && exists)
-            FileDelete(STARTUP_LNK)
-    }
+; Start with Windows: a per-user Run registry entry (no admin needed) that always
+; points at the file that is running right now.
+StartCmd() {
+    return A_IsCompiled ? '"' A_ScriptFullPath '"' : '"' A_AhkPath '" "' A_ScriptFullPath '"'
 }
+
+StartupOn() {
+    try {
+        return RegRead(RUN_KEY, APP) != ""
+    }
+    return false
+}
+
+SetStartup(on, quiet := false) {
+    try {
+        if on
+            RegWrite(StartCmd(), "REG_SZ", RUN_KEY, APP)
+        else
+            RegDelete(RUN_KEY, APP)
+    } catch as e {
+        if !quiet
+            MsgBox("Could not change the Windows startup entry:`n" e.Message, APP, "Icon!")
+        return false
+    }
+    try FileDelete(STARTUP_LNK)     ; remove the shortcut older versions made
+    return true
+}
+
 
 ; "Ctrl+Alt+Shift+Win+K" -> "^!+#k" (any mix of modifiers + exactly one key)
 ParseTyped(text) {
@@ -484,7 +507,7 @@ OpenSettings(*) {
     cbLang := g.Add("Checkbox", "xm y+4 w428", "Also switch the keyboard language to match the result")
     cbLang.Value := gSwitchLang ? 1 : 0
     cbStart := g.Add("Checkbox", "xm y+4 w428", "Start with Windows")
-    cbStart.Value := FileExist(STARTUP_LNK) ? 1 : 0
+    cbStart.Value := StartupOn() ? 1 : 0
 
     ; live preview
     g.SetFont("s10 bold", "Segoe UI")

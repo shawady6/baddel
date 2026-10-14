@@ -38,6 +38,22 @@ Settings are stored in `%AppData%\Baddel\settings.ini`.
 If the shortcut stops working: tray icon → **Settings...** → **Default** → **Save**.
 If the app won't start properly, delete `%AppData%\Baddel\settings.ini` and run it again.
 
+## التشغيل مع الويندوز
+
+من **Settings** علّم على **Start with Windows** ← Save. لو مفتحش:
+1. حط `enable-startup.bat` في نفس فولدر `baddel.exe` ودبل كليك عليه (مش محتاج Administrator).
+2. لو نقلت الـ exe لمكان تاني، شغّل الملف تاني. لإلغاء التشغيل التلقائي شغّل `disable-startup.bat`.
+3. تأكد من Task Manager ← **Startup apps** إن Baddel مش Disabled.
+
+## Start with Windows
+
+Tick **Start with Windows** in Settings and press Save. If it still doesn't start:
+1. Put `enable-startup.bat` next to `baddel.exe` and double-click it (no Administrator needed).
+2. If you move the exe, run it again. `disable-startup.bat` turns it off.
+3. Check Task Manager → **Startup apps** and make sure Baddel isn't Disabled.
+
+The app writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and re-writes it on every launch, so moving the file doesn't break it.
+
 ## Notes
 
 - You can type a longer shortcut in Settings, e.g. `Ctrl+Alt+Shift+K` or `Ctrl+Shift+Alt+Win+X`.

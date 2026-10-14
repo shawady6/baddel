@@ -50,7 +50,7 @@ def build_windows(site_dl):
     if os.path.exists(out):
         os.remove(out)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        for name in ("baddel.ahk", "baddel.ico", "README.md"):
+        for name in ("baddel.ahk", "baddel.ico", "README.md", "enable-startup.bat", "disable-startup.bat"):
             z.write(os.path.join(src, name), arcname="baddel-windows/" + name)
     print(f"built {out}")
 
