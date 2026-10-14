@@ -15,7 +15,7 @@ listens for a global shortcut (default `Ctrl+Shift+X`).
 **عايز ملف `.exe` من غير ما تحتاج AutoHotkey على الأجهزة التانية؟**
 كليك يمين على `baddel.ahk` ← **Compile script**، وبيطلع لك `baddel.exe` (جاي مع AutoHotkey).
 
-دبل كليك على الأيقونة بتفتح نافذة **Settings**: تغيير الاختصار، اتجاه التحويل، تجربة مباشرة، والتشغيل مع الويندوز.
+دبل كليك على الأيقونة بتفتح نافذة **Settings**: تغيير الاختصار، اتجاه التحويل، تجربة مباشرة، والتشغيل مع الويندوز، وخيار **تبديل لغة الكيبورد تلقائيًا** (بعد التحويل لعربي يتحول الكيبورد لعربي، وللإنجليزي يتحول لإنجليزي).
 الإعدادات بتتحفظ في `%AppData%\Baddel\settings.ini`.
 
 ## Usage
@@ -27,7 +27,7 @@ listens for a global shortcut (default `Ctrl+Shift+X`).
 
 To get a standalone `baddel.exe`: right-click `baddel.ahk` → **Compile script**.
 
-Double-click the tray icon to open **Settings**: shortcut, direction, a live try-it box, and start with Windows.
+Double-click the tray icon to open **Settings**: shortcut, direction, a live try-it box, start with Windows, and an option to **switch the keyboard language** to match the result.
 Settings are stored in `%AppData%\Baddel\settings.ini`.
 
 ## لو الاختصار وقف

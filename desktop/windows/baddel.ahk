@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.1.1
+;@Ahk2Exe-SetVersion 1.2.0
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,7 +13,7 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.1.1"
+VERSION := "1.2.0"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
@@ -22,6 +22,7 @@ STARTUP_LNK := A_Startup "\Baddel.lnk"
 
 global gEnabled := true
 global gLastWord := true
+global gSwitchLang := false
 global gUndoOut := ""
 global gUndoOrig := ""
 global gDirection := "auto"
@@ -170,7 +171,8 @@ return
 ; Settings
 ; ---------------------------------------------------------------------------
 LoadSettings() {
-    global gEnabled, gLastWord, gDirection, gHotkey, gHotkeyReg
+    global gEnabled, gLastWord, gDirection, gHotkey, gHotkeyReg, gSwitchLang
+    gSwitchLang := IniRead(INI, "main", "switchlang", "0") = "1"
     gEnabled := IniRead(INI, "main", "enabled", "1") = "1"
     gLastWord := IniRead(INI, "main", "lastword", "1") = "1"
     gDirection := IniRead(INI, "main", "direction", "auto")
@@ -189,6 +191,7 @@ SaveSettings() {
         DirCreate(SETTINGS_DIR)
         IniWrite(gEnabled ? "1" : "0", INI, "main", "enabled")
         IniWrite(gLastWord ? "1" : "0", INI, "main", "lastword")
+        IniWrite(gSwitchLang ? "1" : "0", INI, "main", "switchlang")
         IniWrite(gDirection, INI, "main", "direction")
         IniWrite(gHotkey, INI, "main", "hotkey")
         IniWrite(gHotkeyReg, INI, "main", "hotkeyreg")
@@ -336,7 +339,7 @@ HotkeyError(hk) {
 ; Settings window
 ; ---------------------------------------------------------------------------
 OpenSettings(*) {
-    global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog
+    global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog, gSwitchLang
     if IsObject(gDialog) {
         gDialog.Show()
         return
@@ -356,7 +359,7 @@ OpenSettings(*) {
     }
 
     SaveDlg(*) {
-        global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog
+        global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog, gSwitchLang
         hk := hkc.Value
         err := HotkeyError(hk)
         if (err != "") {
@@ -373,6 +376,7 @@ OpenSettings(*) {
         }
         gEnabled := cbOn.Value = 1
         gLastWord := cbLast.Value = 1
+        gSwitchLang := cbLang.Value = 1
         gDirection := r1.Value ? "auto" : (r2.Value ? "ar2en" : "en2ar")
         SetStartup(cbStart.Value = 1)
         SaveSettings()
@@ -437,6 +441,8 @@ OpenSettings(*) {
     cbOn.Value := gEnabled ? 1 : 0
     cbLast := g.Add("Checkbox", "xm y+4 w428", "Convert the last word when nothing is selected")
     cbLast.Value := gLastWord ? 1 : 0
+    cbLang := g.Add("Checkbox", "xm y+4 w428", "Also switch the keyboard language to match the result")
+    cbLang.Value := gSwitchLang ? 1 : 0
     cbStart := g.Add("Checkbox", "xm y+4 w428", "Start with Windows")
     cbStart.Value := FileExist(STARTUP_LNK) ? 1 : 0
 
@@ -553,6 +559,37 @@ DoFix() {
     ; overwrites it); pressing the shortcut again right away undoes it
     gUndoOut := out
     gUndoOrig := sel
+    if gSwitchLang
+        SwitchLayoutFor(out)
+}
+
+; Switch the keyboard layout of the active window to the language of `text`
+; (Arabic letters -> an installed Arabic layout, Latin letters -> an installed English one).
+SwitchLayoutFor(text) {
+    ar := 0
+    la := 0
+    Loop Parse, text {
+        c := Ord(A_LoopField)
+        if (c >= 0x600 && c <= 0x6FF)
+            ar += 1
+        else if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122))
+            la += 1
+    }
+    if (ar = 0 && la = 0)
+        return
+    want := (ar >= la) ? 0x01 : 0x09        ; primary language id: Arabic / English
+    n := DllCall("GetKeyboardLayoutList", "Int", 0, "Ptr", 0)
+    if (n < 1)
+        return
+    buf := Buffer(n * A_PtrSize)
+    DllCall("GetKeyboardLayoutList", "Int", n, "Ptr", buf)
+    Loop n {
+        hkl := NumGet(buf, (A_Index - 1) * A_PtrSize, "Ptr")
+        if ((hkl & 0x3FF) = want) {
+            try PostMessage(0x50, 0, hkl, , "A")    ; WM_INPUTLANGCHANGEREQUEST
+            return
+        }
+    }
 }
 
 ; Pressing the shortcut again with nothing selected, right after a conversion:
@@ -577,6 +614,8 @@ TryUndo() {
             return true
         Send("^v")
         Sleep(150)
+        if gSwitchLang
+            SwitchLayoutFor(orig)
         return true
     }
     Send("{Right}")
