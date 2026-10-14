@@ -5,7 +5,7 @@
 <br>
 
 [![Download](https://img.shields.io/badge/Download-baddel.zip-4f46e5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip)
-[![Windows](https://img.shields.io/badge/Windows_app-baddel--windows.zip-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip)
+[![Windows](https://img.shields.io/badge/Windows_app-baddel.exe-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe)
 [![Website](https://img.shields.io/badge/Website-live_demo-2563eb?style=for-the-badge&logo=githubpages&logoColor=white)](https://shawady6.github.io/baddel/)
 
 ![Version](https://img.shields.io/badge/version-1.3.1-4f46e5)
@@ -79,7 +79,7 @@
 ### نسخة الويندوز (بتشتغل في أي برنامج)
 
 لو عاوز التحويل **في أي برنامج حتى شريط العنوان**، فيه برنامج صغير للويندوز بيقعد جنب الساعة وبيشتغل بنفس الاختصار:
-[**حمّل baddel-windows.zip**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip)، وثبّت [AutoHotkey v2](https://www.autohotkey.com) (مجاني)، ودبل كليك على `baddel.ahk`. التفاصيل في [desktop/windows](desktop/windows/README.md).
+[**حمّل baddel.exe**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) ودبل كليك عليه (من غير تثبيت). لو ويندوز طلّع تحذير دوس More info ← Run anyway. وفيه كمان [نسخة ZIP](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip) بتحتاج [AutoHotkey v2](https://www.autohotkey.com). التفاصيل في [desktop/windows](desktop/windows/README.md).
 
 ### حدود لازم تعرفها
 
@@ -136,7 +136,7 @@ To change the shortcut: click the extension icon → **Open settings** → click
 ### Windows app (works in any program)
 
 Want it **everywhere, including the browser address bar**? There's a small Windows tray app with the same shortcut:
-[**Download baddel-windows.zip**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip), install [AutoHotkey v2](https://www.autohotkey.com) (free) and double-click `baddel.ahk`. Details in [desktop/windows](desktop/windows/README.md).
+[**Download baddel.exe**](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) and double-click it (no installation). If Windows warns about an unsigned app, click More info → Run anyway. A [ZIP version](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip) that needs [AutoHotkey v2](https://www.autohotkey.com) is also available. Details in [desktop/windows](desktop/windows/README.md).
 
 ### Limitations
 
@@ -182,6 +182,8 @@ python3 scripts/release.py    # build the zip and sync docs/shared.js
 ```
 
 `docs/shared.js` is a copy of `extension/shared.js` so the website demo uses exactly the same conversion map. `release.py` keeps them in sync and the tests fail if they differ.
+
+`docs/downloads/baddel.exe` is built on Windows (right-click `baddel.ahk` → Compile script) and must be rebuilt and replaced whenever `baddel.ahk` changes.
 
 **Releasing a new version:** bump `version` in `extension/manifest.json`, run `python3 scripts/release.py` and `node tests/test_logic.js`, then commit and push. The website's download button serves `docs/downloads/baddel.zip`.
 
