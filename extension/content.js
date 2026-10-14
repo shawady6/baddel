@@ -50,11 +50,63 @@
     }
   }
 
+  // Rich-text selections can span paragraphs, list items and bold/italic runs.
+  // range.toString() drops those boundaries and insertText of the joined string would
+  // flatten them, so convert each text node on its own and keep the structure.
+  function fixEditableRange(range, sel) {
+    const root = range.commonAncestorContainer;
+    const parts = [];
+    if (root.nodeType === Node.TEXT_NODE) {
+      parts.push({ node: root, s: range.startOffset, e: range.endOffset });
+    } else {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!range.intersectsNode(n)) continue;
+        const s = n === range.startContainer ? range.startOffset : 0;
+        const e = n === range.endContainer ? range.endOffset : n.length;
+        if (e > s) parts.push({ node: n, s, e });
+      }
+    }
+    if (!parts.length) return;
+    const whole = parts.map((x) => x.node.data.slice(x.s, x.e)).join("\n");
+    let mode = settings.direction;
+    if (mode === "auto") {
+      const ar = (whole.match(/[\u0600-\u06FF]/g) || []).length;
+      const la = (whole.match(/[A-Za-z]/g) || []).length;
+      if (!ar && !la) return;
+      mode = ar >= la ? "ar2en" : "en2ar";
+    }
+    let any = false;
+    for (const x of parts) {
+      const original = x.node.data.slice(x.s, x.e);
+      const changed = convert(original, mode);
+      x.rn = x.node; x.rs = x.s; x.re = x.e;
+      if (changed === original) continue;
+      any = true;
+      sel.setBaseAndExtent(x.node, x.s, x.node, x.e);
+      if (document.execCommand("insertText", false, changed) && sel.focusNode && sel.focusNode.nodeType === Node.TEXT_NODE) {
+        // the editor may have swapped the node: remember where the result really is
+        x.rn = sel.focusNode; x.re = sel.focusOffset; x.rs = x.re - changed.length;
+      } else {
+        x.node.replaceData(x.s, x.e - x.s, changed);
+        x.rn = x.node; x.rs = x.s; x.re = x.s + changed.length;
+      }
+    }
+    if (!any) return;
+    try {
+      // keep the result selected so pressing the shortcut again toggles it back
+      const first = parts[0], last = parts[parts.length - 1];
+      if (first.rn.isConnected && last.rn.isConnected)
+        sel.setBaseAndExtent(first.rn, Math.max(first.rs, 0), last.rn, last.re);
+    } catch (e) { /* selection restore is best-effort */ }
+  }
+
   function fixEditable() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0).cloneRange();
     const wasCollapsed = range.collapsed;
+    if (!wasCollapsed) return fixEditableRange(range, sel);
     let trailing = 0;
 
     if (wasCollapsed) {

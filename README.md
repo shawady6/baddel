@@ -8,7 +8,7 @@
 [![Windows](https://img.shields.io/badge/Windows_app-baddel--windows.zip-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel-windows.zip)
 [![Website](https://img.shields.io/badge/Website-live_demo-2563eb?style=for-the-badge&logo=githubpages&logoColor=white)](https://shawady6.github.io/baddel/)
 
-![Version](https://img.shields.io/badge/version-1.3.0-4f46e5)
+![Version](https://img.shields.io/badge/version-1.3.1-4f46e5)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-2563eb)
 ![Browsers](https://img.shields.io/badge/Chrome%20%C2%B7%20Edge%20%C2%B7%20Brave%20%C2%B7%20Opera-supported-16a34a)
 ![Privacy](https://img.shields.io/badge/data%20collected-none-16a34a)

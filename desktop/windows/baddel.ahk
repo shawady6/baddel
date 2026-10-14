@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.2.0
+;@Ahk2Exe-SetVersion 1.2.1
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,7 +13,7 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.2.0"
+VERSION := "1.2.1"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
@@ -320,6 +320,34 @@ SetStartup(on) {
     }
 }
 
+; "Ctrl+Alt+Shift+Win+K" -> "^!+#k" (any mix of modifiers + exactly one key)
+ParseTyped(text) {
+    mods := ""
+    key := ""
+    for part in StrSplit(text, "+", " `t") {
+        p := StrLower(part)
+        if (p = "")
+            continue
+        if (key != "")
+            return ""                      ; a key must come last
+        if (p = "ctrl" || p = "control")
+            mods .= InStr(mods, "^") ? "" : "^"
+        else if (p = "shift")
+            mods .= InStr(mods, "+") ? "" : "+"
+        else if (p = "alt")
+            mods .= InStr(mods, "!") ? "" : "!"
+        else if (p = "win" || p = "windows" || p = "meta")
+            mods .= InStr(mods, "#") ? "" : "#"
+        else
+            key := p
+    }
+    if (key = "" || mods = "")
+        return ""
+    if (StrLen(key) > 1 && !RegExMatch(key, "^(f([1-9]|1\d|2[0-4])|space|enter|tab|esc|escape|backspace|delete|del|insert|ins|home|end|pgup|pgdn|up|down|left|right)$"))
+        return ""
+    return mods key
+}
+
 ; Returns an error message for an unusable shortcut, or "" when it is fine.
 HotkeyError(hk) {
     if (hk = "")
@@ -361,6 +389,14 @@ OpenSettings(*) {
     SaveDlg(*) {
         global gHotkey, gHotkeyReg, gEnabled, gLastWord, gDirection, gDialog, gSwitchLang
         hk := hkc.Value
+        typed := Trim(edTyped.Value)
+        if (typed != "") {
+            hk := ParseTyped(typed)
+            if (hk = "") {
+                msg.Value := "Could not read that shortcut. Example: Ctrl+Alt+Shift+K"
+                return
+            }
+        }
         err := HotkeyError(hk)
         if (err != "") {
             msg.Value := err
@@ -415,6 +451,10 @@ OpenSettings(*) {
     hkc := g.Add("Hotkey", "xm y+8 w300 h28", gHotkey)
     bDef := g.Add("Button", "x+10 yp w118 h28", "Default")
     bDef.OnEvent("Click", (*) => hkc.Value := DEFAULT_HK)
+    g.SetFont("s9 norm c5D6980", "Segoe UI")
+    g.Add("Text", "xm y+8 w428", "Or type a longer one (up to Ctrl+Shift+Alt+Win + a key), e.g. Ctrl+Alt+Shift+K")
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    edTyped := g.Add("Edit", "xm y+4 w428 h26", "")
     g.SetFont("s9 norm cC0392B", "Segoe UI")
     msg := g.Add("Text", "xm y+4 w428 h20", "")
     g.SetFont("s10 norm c000000", "Segoe UI")

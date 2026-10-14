@@ -40,6 +40,8 @@ If the app won't start properly, delete `%AppData%\Baddel\settings.ini` and run 
 
 ## Notes
 
+- You can type a longer shortcut in Settings, e.g. `Ctrl+Alt+Shift+K` or `Ctrl+Shift+Alt+Win+X`.
+- The app pastes the converted text as plain text, so bold/italic inside the converted selection is lost in rich editors (Word). The browser extension keeps formatting.
 - The shortcut is bound to the physical key, so it works whichever keyboard language is active.
 
 - If the target app runs as **Administrator**, run Baddel as Administrator too.
