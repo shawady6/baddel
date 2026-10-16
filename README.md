@@ -2,7 +2,7 @@
 
 <img src="docs/assets/og.png" alt="Baddel · بدّل" width="720">
 
-[![Windows](https://img.shields.io/badge/Windows-baddel.exe-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe)
+[![Windows](https://img.shields.io/badge/Windows-Installer-0f766e?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe)
 [![Extension](https://img.shields.io/badge/Chrome_%C2%B7_Edge-baddel.zip-4f46e5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.zip)
 [![Website](https://img.shields.io/badge/Website-live_demo-2563eb?style=for-the-badge)](https://shawady6.github.io/baddel/)
 
@@ -26,7 +26,7 @@
 ### حمّل واشتغل
 
 **🪟 نسخة الويندوز** (بتشتغل في أي برنامج حتى شريط العنوان)
-1. [حمّل baddel.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) وشغّله.
+1. [حمّل Baddel-Setup.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe) وشغّله (أو [النسخة المحمولة](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) من غير تثبيت).
 2. لو ويندوز طلّع تحذير: **More info ← Run anyway**.
 3. دبل كليك على الأيقونة جنب الساعة للإعدادات.
 
@@ -54,7 +54,7 @@ Press it again to undo. With nothing selected, it converts the last word.
 ### Download
 
 **🪟 Windows app** (works in any program, even the browser address bar)
-1. [Download baddel.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) and run it.
+1. [Download Baddel-Setup.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe) and run it (or the [portable exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe), no installation).
 2. If Windows shows a warning: **More info → Run anyway** (the app isn't code-signed).
 3. Double-click the tray icon for settings.
 
