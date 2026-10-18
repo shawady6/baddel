@@ -26,7 +26,7 @@
 ### حمّل واشتغل
 
 **🪟 نسخة الويندوز** (بتشتغل في أي برنامج حتى شريط العنوان)
-1. [حمّل Baddel-Setup.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe) وشغّله (أو [النسخة المحمولة](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe) من غير تثبيت).
+1. [حمّل Baddel-Setup.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe) وشغّله.
 2. لو ويندوز طلّع تحذير: **More info ← Run anyway**.
 3. دبل كليك على الأيقونة جنب الساعة للإعدادات.
 
@@ -54,7 +54,7 @@ Press it again to undo. With nothing selected, it converts the last word.
 ### Download
 
 **🪟 Windows app** (works in any program, even the browser address bar)
-1. [Download Baddel-Setup.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe) and run it (or the [portable exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/baddel.exe), no installation).
+1. [Download Baddel-Setup.exe](https://github.com/shawady6/baddel/raw/main/docs/downloads/Baddel-Setup.exe) and run it.
 2. If Windows shows a warning: **More info → Run anyway** (the app isn't code-signed).
 3. Double-click the tray icon for settings.
 
@@ -82,7 +82,7 @@ scripts/     release.py (builds zips), gen_ahk.js (conversion tables)
 tests/       node tests/test_logic.js
 ```
 
-`docs/downloads/baddel.exe` is built on Windows (right-click `baddel.ahk` → Compile script) and must be replaced whenever `baddel.ahk` changes. Release: bump `extension/manifest.json`, run `python3 scripts/release.py` and `node tests/test_logic.js`, commit, push.
+`docs/downloads/Baddel-Setup.exe` is built on Windows (Compile `baddel.ahk`, then Inno Setup on `baddel.iss`) and must be replaced whenever `baddel.ahk` changes. Release: bump `extension/manifest.json`, run `python3 scripts/release.py` and `node tests/test_logic.js`, commit, push.
 
 </details>
 
