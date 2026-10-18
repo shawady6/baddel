@@ -4,7 +4,7 @@
 ; 3. The installer appears in .\Output\Baddel-Setup.exe
 
 #define AppName "Baddel"
-#define AppVersion "1.2.2"
+#define AppVersion "1.3.0"
 
 [Setup]
 AppId={{B7A1D3E2-5C4F-4E58-9A26-BADDE1000001}
