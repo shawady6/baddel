@@ -5,7 +5,7 @@ Persistent
 ;@Ahk2Exe-SetMainIcon baddel.ico
 ;@Ahk2Exe-SetName Baddel
 ;@Ahk2Exe-SetDescription Baddel - Arabic/English keyboard fixer
-;@Ahk2Exe-SetVersion 1.2.2
+;@Ahk2Exe-SetVersion 1.3.0
 
 ; Baddel (بدّل) for Windows
 ; Select text typed in the wrong keyboard language, press the shortcut, done.
@@ -13,7 +13,7 @@ Persistent
 ; https://github.com/shawady6/baddel
 
 APP := "Baddel"
-VERSION := "1.2.2"
+VERSION := "1.3.0"
 SITE := "https://shawady6.github.io/baddel/"
 DEFAULT_HK := "^+x"
 SETTINGS_DIR := A_AppData "\Baddel"
@@ -534,15 +534,30 @@ OpenSettings(*) {
 ; ---------------------------------------------------------------------------
 ; Conversion
 ; ---------------------------------------------------------------------------
+; Auto mode works word by word: Latin words become Arabic, Arabic words become English.
+ConvertWord(w) {
+    ar := StrLen(RegExReplace(w, "[^\x{0600}-\x{06FF}]"))
+    la := StrLen(RegExReplace(w, "[^A-Za-z]"))
+    if (ar = 0 && la = 0)
+        return w
+    tbl := (ar >= la) ? arToEn : enToAr
+    out := ""
+    for ch in StrSplit(w)
+        out .= tbl.Has(ch) ? tbl[ch] : ch
+    return out
+}
+
 Convert(text, mode := "") {
     if (mode = "")
         mode := gDirection
     if (mode = "auto") {
-        ar := StrLen(RegExReplace(text, "[^\x{0600}-\x{06FF}]"))
-        la := StrLen(RegExReplace(text, "[^A-Za-z]"))
-        if (ar = 0 && la = 0)
-            return text
-        mode := (ar >= la) ? "ar2en" : "en2ar"
+        out := ""
+        pos := 1
+        while (pos <= StrLen(text) && RegExMatch(text, "\S+|\s+", &m, pos)) {
+            out .= ConvertWord(m[0])
+            pos := m.Pos + m.Len
+        }
+        return out
     }
     tbl := (mode = "ar2en") ? arToEn : enToAr
     out := ""

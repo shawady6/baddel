@@ -31,14 +31,19 @@
     return out;
   };
 
-  // mode: "auto" (decide from the dominant script), "ar2en" or "en2ar".
+  // mode: "auto" (decide word by word from each word's own script), "ar2en" or "en2ar".
+  // Word by word means text that is wrong in both directions is fixed in one go:
+  // Latin words become Arabic and Arabic words become English.
+  const convertWord = (w) => {
+    const arabic = (w.match(/[؀-ۿ]/g) || []).length;
+    const latin = (w.match(/[A-Za-z]/g) || []).length;
+    if (!arabic && !latin) return w;
+    return mapText(w, arabic >= latin ? arToEn : enToAr);
+  };
   const convert = (text, mode = "auto") => {
     if (mode === "ar2en") return mapText(text, arToEn);
     if (mode === "en2ar") return mapText(text, enToAr);
-    const arabic = (text.match(/[؀-ۿ]/g) || []).length;
-    const latin = (text.match(/[A-Za-z]/g) || []).length;
-    if (!arabic && !latin) return text;
-    return mapText(text, arabic >= latin ? arToEn : enToAr);
+    return text.replace(/\S+/gu, convertWord);
   };
 
   // ---------- settings ----------

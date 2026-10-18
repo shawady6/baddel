@@ -68,14 +68,7 @@
       }
     }
     if (!parts.length) return;
-    const whole = parts.map((x) => x.node.data.slice(x.s, x.e)).join("\n");
-    let mode = settings.direction;
-    if (mode === "auto") {
-      const ar = (whole.match(/[\u0600-\u06FF]/g) || []).length;
-      const la = (whole.match(/[A-Za-z]/g) || []).length;
-      if (!ar && !la) return;
-      mode = ar >= la ? "ar2en" : "en2ar";
-    }
+    const mode = settings.direction;   // "auto" already works word by word
     let any = false;
     for (const x of parts) {
       const original = x.node.data.slice(x.s, x.e);

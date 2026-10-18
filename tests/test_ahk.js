@@ -30,10 +30,15 @@ module.exports = function run(t) {
   // ---- replay of Convert() from baddel.ahk
   const ahkConvert = (text, mode) => {
     if (mode === "auto") {
-      const ar = (text.match(/[؀-ۿ]/g) || []).length;
-      const la = (text.match(/[A-Za-z]/g) || []).length;
-      if (!ar && !la) return text;
-      mode = ar >= la ? "ar2en" : "en2ar";
+      return text.replace(/\S+/gu, (w) => {
+        const ar = (w.match(/[؀-ۿ]/g) || []).length;
+        const la = (w.match(/[A-Za-z]/g) || []).length;
+        if (!ar && !la) return w;
+        let o = "";
+        const m = ar >= la ? arToEn : enToAr;
+        for (const ch of w) o += m.has(ch) ? m.get(ch) : ch;
+        return o;
+      });
     }
     const map = mode === "ar2en" ? arToEn : enToAr;
     let out = "";
@@ -60,7 +65,7 @@ module.exports = function run(t) {
   }
   t(`ahk: Convert() matches the extension on ${count} random cases`, same);
 
-  const examples = [["hgsghl ugd;l", "السلام عليكم"], ["lvpfh", "مرحبا"], ["اثممخ", "hello"]];
+  const examples = [["hgsghl ugd;l", "السلام عليكم"], ["lvpfh", "مرحبا"], ["اثممخ", "hello"], ["hgsghl ugd;l اثممخ", "السلام عليكم hello"], ["اثممخ ,gpfh lvpfh", "hello ولحبا مرحبا"]];
   t("ahk: known examples", examples.every(([i, o]) => ahkConvert(i, "auto") === o));
 
   // ---- cheap structural sanity for a file we can't execute here

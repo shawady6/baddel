@@ -48,6 +48,8 @@ t("hgsghl ugd;l -> السلام عليكم", A.convert("hgsghl ugd;l") === "ال
 t("round trip", A.convert(A.convert("lvpfh hgsghl")) === "lvpfh hgsghl");
 t("لا -> gh", A.convert("لا") === "gh");
 t("digits untouched", A.convert("123") === "123");
+t("auto is word by word: mixed wrong text flips both ways", A.convert("hgsghl ugd;l اثممخ", "auto") === "السلام عليكم hello");
+t("auto keeps spacing, digits and newlines", A.convert("a  b\nhgsghl 123 !", "auto") === "ش  لا\nالسلام 123 !");
 t("forced ar2en leaves latin alone", A.convert("abc", "ar2en") === "abc");
 t("forced en2ar", A.convert("hgsghl", "en2ar") === "السلام");
 
