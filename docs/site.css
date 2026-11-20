@@ -210,3 +210,6 @@ kbd {
 .card .mini { margin: 0; padding-inline-start: 20px; color: var(--muted); font-size: 14.5px; display: grid; gap: 6px; }
 .card .tabs { margin-top: 14px; }
 @media (max-width: 860px) { .cards.three, .cards.two { grid-template-columns: 1fr; } }
+
+.cards.one { grid-template-columns: minmax(0, 560px); justify-content: center; }
+.card .alt { margin-inline-start: 12px; font-size: 14px; }
