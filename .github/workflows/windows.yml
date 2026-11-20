@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Also commit baddel.exe and Baddel-Setup.exe to docs/downloads (updates the website)"
+        description: "Also commit the build to docs/downloads/rust (test download, does not touch the main download)"
         type: boolean
         default: false
 
@@ -67,14 +67,14 @@ jobs:
           name: baddel-windows
           path: out/*
 
-      - name: Publish to the website
+      - name: Publish test build
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         shell: bash
         run: |
-          cp out/baddel.exe docs/downloads/baddel.exe
-          cp out/Baddel-Setup.exe docs/downloads/Baddel-Setup.exe
+          mkdir -p docs/downloads/rust
+          cp out/baddel.exe out/Baddel-Setup.exe out/SHA256SUMS.txt docs/downloads/rust/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/downloads/baddel.exe docs/downloads/Baddel-Setup.exe
-          git commit -m "Publish Windows build from CI"
+          git add docs/downloads/rust
+          git commit -m "Publish Windows test build from CI"
           git push
