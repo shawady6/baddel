@@ -11,6 +11,7 @@
     lead: "Type as usual. If the text comes out in the wrong language (like <code dir=\"ltr\">hgsghl</code> instead of «السلام»), press one shortcut to fix it, in any program.",
     dl_win: "Download for Windows",
     platforms: "Windows 10 and 11. Small, fast, no internet needed.",
+    notwin: "The app runs on Windows only. Open this page on a Windows computer to download it.",
     demo_h: "Try it now",
     demo_sub: "Type or paste text in the wrong language and see the result instantly.",
     in_label: "Text typed in the wrong language", out_label: "Result", chips_label: "Try an example:",
@@ -81,6 +82,8 @@
       }
     })();
   })();
+
+  if (!/Windows/i.test(navigator.userAgent)) $("#notwin").hidden = false;
 
   let saved = null;
   try { saved = localStorage.getItem("baddel-lang"); } catch (e) { /* ignore */ }

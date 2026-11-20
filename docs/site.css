@@ -213,3 +213,9 @@ kbd {
 
 .cards.one { grid-template-columns: minmax(0, 560px); justify-content: center; }
 .card .alt { margin-inline-start: 12px; font-size: 14px; }
+.card .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.card .actions .alt { margin: 0; }
+@media (max-width: 520px) {
+  .cta .btn { width: 100%; justify-content: center; }
+  .card .actions .btn { width: 100%; justify-content: center; }
+}
