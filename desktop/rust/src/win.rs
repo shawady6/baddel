@@ -2,7 +2,7 @@
 //! keyboard-layout switching and the "Start with Windows" registry entry.
 
 use std::ptr::{null, null_mut};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -19,9 +19,9 @@ use windows_sys::Win32::System::Registry::{
 };
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, GetKeyboardLayoutList, HKL, RegisterHotKey, SendInput, UnregisterHotKey, INPUT, INPUT_0, INPUT_KEYBOARD,
-    KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_NOREPEAT, VK_CONTROL, VK_LEFT, VK_LWIN, VK_MENU,
-    VK_RIGHT, VK_RWIN, VK_SHIFT,
+    EnableWindow, GetAsyncKeyState, GetKeyboardLayoutList, HKL, RegisterHotKey, SendInput, UnregisterHotKey, INPUT, INPUT_0, INPUT_KEYBOARD,
+    KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_NOREPEAT, VK_CONTROL, VK_HOME, VK_LEFT, VK_LWIN,
+    VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT,
 };
 use windows_sys::Win32::UI::Shell::{
     ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE,
@@ -33,12 +33,21 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, TrackPopupMenu, TranslateMessage,
     IDI_APPLICATION, MF_CHECKED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, TPM_BOTTOMALIGN, TPM_RIGHTBUTTON,
     WM_APP, WM_COMMAND, WM_CONTEXTMENU, WM_DESTROY, WM_HOTKEY, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP,
-    WNDCLASSW,
+    WNDCLASSW, AdjustWindowRectEx, DestroyWindow, GetDlgItem,
+    GetDlgItemTextW, GetSystemMetrics, IsDialogMessageW, MessageBoxW, SendMessageW,
+    SetDlgItemTextW, ShowWindow, BS_AUTOCHECKBOX, BS_AUTORADIOBUTTON, BS_DEFPUSHBUTTON, BS_GROUPBOX,
+    BS_PUSHBUTTON, ES_AUTOHSCROLL, ES_READONLY, IDCANCEL, IDOK, MB_ICONWARNING, MB_OK, SM_CXSCREEN, SM_CYSCREEN,
+    SW_SHOW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
+    WS_MINIMIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
+use windows_sys::Win32::Graphics::Gdi::{CreateFontW, DeleteObject, GetSysColorBrush, COLOR_BTNFACE};
+use windows_sys::Win32::UI::Controls::{CheckDlgButton, CheckRadioButton, IsDlgButtonChecked};
+use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
+use windows_sys::Win32::Foundation::RECT;
 
 use crate::core::{
-    contains_boundary, convert, dominant_script, format_hotkey, key_steps, parse_hotkey, split_last_token,
-    Direction, Script, Settings, DEFAULT_HOTKEY,
+    convert, dominant_script, format_hotkey, hotkey_text, key_steps, last_unit, parse_hotkey, Direction, LastMode,
+    Script, Settings, DEFAULT_HOTKEY,
 };
 
 const APP_NAME: &str = "Baddel";
@@ -50,6 +59,7 @@ const HOTKEY_ID: i32 = 1;
 const CF_UNICODETEXT: u32 = 13;
 
 // menu command ids
+const ID_SETTINGS: usize = 1000;
 const ID_ENABLED: usize = 1001;
 const ID_LASTWORD: usize = 1002;
 const ID_SWITCHLANG: usize = 1003;
@@ -464,49 +474,104 @@ fn take_undo() -> Option<Undo> {
     }
 }
 
-/// Second press right after a conversion: put the original text back.
-fn try_undo(s: &Settings) -> bool {
-    let Some(u) = take_undo() else { return false };
-    let n = key_steps(&u.out);
-    if n == 0 || n > 2000 {
-        return false;
-    }
-    shift_tap(VK_LEFT, n);
-    sleep_ms(30);
-    let cur = copy_selection();
-    if cur.map(|c| norm(&c)) == Some(norm(&u.out)) {
-        if paste_text(&u.orig) && s.switch_lang {
-            switch_layout_for(&u.orig);
-        }
-        true
+#[derive(Clone, Copy, PartialEq)]
+enum Dir {
+    Ltr,
+    Rtl,
+}
+
+fn guess_dir(text: &str) -> Dir {
+    if dominant_script(text) == Some(Script::Arabic) {
+        Dir::Rtl
     } else {
-        chord(&[VK_RIGHT]); // collapse the selection back to where the caret was
-        false
+        Dir::Ltr
     }
 }
 
-/// Select the last word before the caret and return what was selected
-/// (`(text_of_last_token, trailing_whitespace)`).
-fn select_last_token() -> Option<(String, String)> {
-    let mut sel = String::new();
-    for _ in 0..6 {
-        chord(&[VK_CONTROL, VK_SHIFT, VK_LEFT]);
-        sleep_ms(25);
-        let t = copy_selection()?;
-        if t == sel {
-            break; // the selection stopped growing: start of the field
-        }
-        sel = t;
-        if contains_boundary(&sel) {
-            break;
-        }
+/// Collapse a selection that ends at the original caret position.
+fn collapse(dir: Dir) {
+    chord(&[if dir == Dir::Ltr { VK_RIGHT } else { VK_LEFT }]);
+}
+
+/// Shift+Home selects from the logical start of the line to the caret (this works the same in
+/// left-to-right and right-to-left text, unlike Ctrl+Shift+Left). Returns the selected text.
+fn select_line_prefix() -> Option<String> {
+    chord(&[VK_SHIFT, VK_HOME]);
+    sleep_ms(25);
+    copy_selection().map(|t| norm(&t))
+}
+
+/// With `prefix` selected (start of line .. caret), shrink the selection from its start by `steps`
+/// characters until exactly `expected` is selected. The arrow key that moves the start inwards
+/// depends on the text direction, so the first step is a probe.
+fn shrink_to(prefix: &str, steps: usize, expected: &str) -> Result<(), Dir> {
+    if steps == 0 {
+        return Ok(());
     }
-    if sel.is_empty() {
-        return None;
+    shift_tap(VK_RIGHT, 1);
+    sleep_ms(25);
+    let Some(p2) = copy_selection().map(|t| norm(&t)) else { return Err(guess_dir(prefix)) };
+    let before = prefix.chars().count();
+    let after = p2.chars().count();
+    let (dir, remaining) = if after < before {
+        (Dir::Ltr, steps - 1)
+    } else {
+        if after > before {
+            shift_tap(VK_LEFT, 1); // that step went the wrong way, undo it
+        }
+        (Dir::Rtl, steps)
+    };
+    shift_tap(if dir == Dir::Ltr { VK_RIGHT } else { VK_LEFT }, remaining);
+    sleep_ms(30);
+    match copy_selection().map(|t| norm(&t)) {
+        Some(t) if t == norm(expected) => Ok(()),
+        _ => Err(dir),
     }
-    let (steps, token, trail) = split_last_token(&sel);
-    shift_tap(VK_RIGHT, steps); // leave only the last token (and its trailing space) selected
-    Some((token, trail))
+}
+
+/// Second press right after a conversion: put the original text back.
+fn try_undo(s: &Settings) -> bool {
+    let Some(u) = take_undo() else { return false };
+    let out = norm(&u.out);
+    let n = key_steps(&out);
+    if n == 0 || n > 2000 {
+        return false;
+    }
+    let selected = if out.contains('\n') {
+        shift_tap(VK_LEFT, n);
+        sleep_ms(30);
+        if copy_selection().map(|t| norm(&t)).as_deref() == Some(out.as_str()) {
+            true
+        } else {
+            collapse(Dir::Ltr);
+            false
+        }
+    } else {
+        match select_line_prefix() {
+            Some(prefix) if prefix.ends_with(&out) => {
+                let steps = key_steps(&prefix[..prefix.len() - out.len()]);
+                match shrink_to(&prefix, steps, &out) {
+                    Ok(()) => true,
+                    Err(d) => {
+                        collapse(d);
+                        false
+                    }
+                }
+            }
+            Some(prefix) => {
+                collapse(guess_dir(&prefix));
+                false
+            }
+            None => false,
+        }
+    };
+    if selected && paste_text(&u.orig) {
+        if s.switch_lang {
+            switch_layout_for(&u.orig);
+        }
+        return true;
+    }
+    false
 }
 
 fn fix_inner(s: &Settings) {
@@ -531,11 +596,22 @@ fn fix_inner(s: &Settings) {
             if !s.last_word {
                 return;
             }
-            let Some((token, trail)) = select_last_token() else { return };
-            let out = format!("{}{}", convert(&token, s.direction), trail);
-            let orig = format!("{}{}", token, trail);
+            let Some(prefix) = select_line_prefix() else { return };
+            let Some((steps, unit, trail)) = last_unit(&prefix, s.last_mode) else {
+                collapse(guess_dir(&prefix));
+                return;
+            };
+            let orig = format!("{}{}", unit, trail);
+            let dir = match shrink_to(&prefix, steps, &orig) {
+                Ok(()) => guess_dir(&prefix),
+                Err(d) => {
+                    collapse(d);
+                    return;
+                }
+            };
+            let out = format!("{}{}", convert(&unit, s.direction), trail);
             if out == orig {
-                chord(&[VK_RIGHT]);
+                collapse(dir);
                 return;
             }
             converted_from = Some((orig, out));
@@ -641,6 +717,7 @@ fn show_menu(hwnd: HWND) {
         let keys = CreatePopupMenu();
 
         append(menu, MF_STRING | 0x1, 0, &format!("Baddel  ({})", s.hotkey)); // 0x1 = MF_GRAYED
+        append(menu, MF_STRING, ID_SETTINGS, "Settings...");
         append(menu, MF_SEPARATOR, 0, "");
         append(menu, flag(s.enabled), ID_ENABLED, "Enabled");
 
@@ -723,6 +800,7 @@ fn update_settings<F: FnOnce(&mut Settings)>(f: F) {
 
 fn on_command(hwnd: HWND, id: usize) {
     match id {
+        ID_SETTINGS => open_settings(),
         ID_ENABLED => update_settings(|s| s.enabled = !s.enabled),
         ID_LASTWORD => update_settings(|s| s.last_word = !s.last_word),
         ID_SWITCHLANG => update_settings(|s| s.switch_lang = !s.switch_lang),
@@ -749,7 +827,7 @@ fn on_command(hwnd: HWND, id: usize) {
         }
         ID_WEBSITE => open_shell(WEBSITE, None),
         ID_EXIT => unsafe {
-            DestroyWindowSafe(hwnd);
+            DestroyWindow(hwnd);
         },
         i if (ID_PRESET_BASE..ID_PRESET_BASE + PRESETS.len()).contains(&i) => {
             let preset = format_hotkey(PRESETS[i - ID_PRESET_BASE]);
@@ -761,11 +839,6 @@ fn on_command(hwnd: HWND, id: usize) {
     }
 }
 
-#[allow(non_snake_case)]
-unsafe fn DestroyWindowSafe(hwnd: HWND) {
-    windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
-}
-
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_HOTKEY => {
@@ -774,7 +847,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_TRAY => {
             let event = (lparam as u32) & 0xFFFF;
-            if event == WM_RBUTTONUP || event == WM_CONTEXTMENU || event == WM_LBUTTONUP {
+            if event == WM_LBUTTONDBLCLK {
+                open_settings();
+            } else if event == WM_RBUTTONUP || event == WM_CONTEXTMENU || event == WM_LBUTTONUP {
                 show_menu(hwnd);
             }
             0
@@ -794,6 +869,294 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             0
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Settings window (plain Win32 controls)
+// ---------------------------------------------------------------------------
+
+static SETTINGS_HWND: AtomicUsize = AtomicUsize::new(0);
+static SETTINGS_FONT: AtomicUsize = AtomicUsize::new(0);
+
+const C_ENABLED: usize = 2001;
+const C_HOTKEY: usize = 2002;
+const C_HK_STATUS: usize = 2003;
+const C_DIR_AUTO: usize = 2010;
+const C_DIR_AR2EN: usize = 2011;
+const C_DIR_EN2AR: usize = 2012;
+const C_LAST: usize = 2020;
+const C_LAST_WORD: usize = 2021;
+const C_LAST_RUN: usize = 2022;
+const C_SWITCH: usize = 2030;
+const C_STARTUP: usize = 2031;
+const C_TRY_IN: usize = 2040;
+const C_TRY_OUT: usize = 2041;
+const EN_CHANGE: usize = 0x0300;
+const BN_CLICKED: usize = 0;
+
+struct Ui {
+    hwnd: HWND,
+    font: usize,
+    dpi: i32,
+}
+
+impl Ui {
+    fn sc(&self, v: i32) -> i32 {
+        v * self.dpi / 96
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn add(&self, class: &str, text: &str, style: u32, ex: u32, x: i32, y: i32, w: i32, h: i32, id: usize) -> HWND {
+        unsafe {
+            let c = wide(class);
+            let t = wide(text);
+            let h_ctl = CreateWindowExW(
+                ex,
+                c.as_ptr(),
+                t.as_ptr(),
+                WS_CHILD | WS_VISIBLE | style,
+                self.sc(x),
+                self.sc(y),
+                self.sc(w),
+                self.sc(h),
+                self.hwnd,
+                id as _,
+                GetModuleHandleW(null()),
+                null(),
+            );
+            SendMessageW(h_ctl, WM_SETFONT, self.font, 1);
+            h_ctl
+        }
+    }
+    fn label(&self, text: &str, x: i32, y: i32, w: i32, h: i32, id: usize) {
+        self.add("STATIC", text, 0, 0, x, y, w, h, id);
+    }
+    fn check(&self, text: &str, x: i32, y: i32, w: i32, id: usize) {
+        self.add("BUTTON", text, BS_AUTOCHECKBOX as u32 | WS_TABSTOP, 0, x, y, w, 20, id);
+    }
+    fn radio(&self, text: &str, x: i32, y: i32, w: i32, id: usize, first: bool) {
+        let g = if first { WS_GROUP | WS_TABSTOP } else { 0 };
+        self.add("BUTTON", text, BS_AUTORADIOBUTTON as u32 | g, 0, x, y, w, 20, id);
+    }
+}
+
+fn dlg_text(hwnd: HWND, id: usize) -> String {
+    let mut buf = vec![0u16; 4096];
+    let n = unsafe { GetDlgItemTextW(hwnd, id as i32, buf.as_mut_ptr(), buf.len() as i32) };
+    String::from_utf16_lossy(&buf[..n as usize])
+}
+
+fn set_dlg_text(hwnd: HWND, id: usize, text: &str) {
+    let w = wide(text);
+    unsafe {
+        SetDlgItemTextW(hwnd, id as i32, w.as_ptr());
+    }
+}
+
+fn checked(hwnd: HWND, id: usize) -> bool {
+    unsafe { IsDlgButtonChecked(hwnd, id as i32) == 1 }
+}
+
+fn set_checked(hwnd: HWND, id: usize, on: bool) {
+    unsafe {
+        CheckDlgButton(hwnd, id as i32, if on { 1 } else { 0 });
+    }
+}
+
+fn dialog_direction(hwnd: HWND) -> Direction {
+    if checked(hwnd, C_DIR_AR2EN) {
+        Direction::ArToEn
+    } else if checked(hwnd, C_DIR_EN2AR) {
+        Direction::EnToAr
+    } else {
+        Direction::Auto
+    }
+}
+
+fn refresh_try(hwnd: HWND) {
+    let out = convert(&dlg_text(hwnd, C_TRY_IN), dialog_direction(hwnd));
+    set_dlg_text(hwnd, C_TRY_OUT, &out);
+}
+
+fn refresh_hotkey(hwnd: HWND) {
+    let text = dlg_text(hwnd, C_HOTKEY);
+    let msg = match parse_hotkey(&text) {
+        Some(hk) => format!("OK  {}", hotkey_text(hk.mods, hk.vk).unwrap_or_else(|| format_hotkey(&text))),
+        None => "Not valid. Example: Ctrl+Shift+X".to_string(),
+    };
+    set_dlg_text(hwnd, C_HK_STATUS, &msg);
+}
+
+fn refresh_last_mode(hwnd: HWND) {
+    let on = checked(hwnd, C_LAST);
+    unsafe {
+        EnableWindow(GetDlgItem(hwnd, C_LAST_WORD as i32), on as i32);
+        EnableWindow(GetDlgItem(hwnd, C_LAST_RUN as i32), on as i32);
+    }
+}
+
+fn load_into_dialog(hwnd: HWND, s: &Settings) {
+    set_checked(hwnd, C_ENABLED, s.enabled);
+    set_dlg_text(hwnd, C_HOTKEY, &s.hotkey);
+    unsafe {
+        let id = match s.direction {
+            Direction::Auto => C_DIR_AUTO,
+            Direction::ArToEn => C_DIR_AR2EN,
+            Direction::EnToAr => C_DIR_EN2AR,
+        };
+        CheckRadioButton(hwnd, C_DIR_AUTO as i32, C_DIR_EN2AR as i32, id as i32);
+        let lm = if s.last_mode == LastMode::Word { C_LAST_WORD } else { C_LAST_RUN };
+        CheckRadioButton(hwnd, C_LAST_WORD as i32, C_LAST_RUN as i32, lm as i32);
+    }
+    set_checked(hwnd, C_LAST, s.last_word);
+    set_checked(hwnd, C_SWITCH, s.switch_lang);
+    set_checked(hwnd, C_STARTUP, startup_entry().is_some());
+    set_dlg_text(hwnd, C_TRY_IN, "hgsghl ugd;l");
+    refresh_hotkey(hwnd);
+    refresh_last_mode(hwnd);
+    refresh_try(hwnd);
+}
+
+fn save_from_dialog(hwnd: HWND) -> bool {
+    let hk_text = dlg_text(hwnd, C_HOTKEY);
+    if parse_hotkey(&hk_text).is_none() {
+        let t = wide("The shortcut is not valid.\nUse modifiers plus a key, for example Ctrl+Shift+X.");
+        let c = wide("Baddel");
+        unsafe {
+            MessageBoxW(hwnd, t.as_ptr(), c.as_ptr(), MB_OK | MB_ICONWARNING);
+        }
+        return false;
+    }
+    let direction = dialog_direction(hwnd);
+    let enabled = checked(hwnd, C_ENABLED);
+    let last = checked(hwnd, C_LAST);
+    let mode = if checked(hwnd, C_LAST_WORD) { LastMode::Word } else { LastMode::Run };
+    let switch = checked(hwnd, C_SWITCH);
+    let hotkey = format_hotkey(&hk_text);
+    update_settings(|s| {
+        s.enabled = enabled;
+        s.direction = direction;
+        s.last_word = last;
+        s.last_mode = mode;
+        s.switch_lang = switch;
+        s.hotkey = hotkey.clone();
+    });
+    let want_startup = checked(hwnd, C_STARTUP);
+    if want_startup != startup_entry().is_some() && !set_startup(want_startup) {
+        balloon("Baddel", "Could not change the Start with Windows setting.");
+    }
+    register_hotkey(hwnd_main());
+    true
+}
+
+fn build_settings_window(hwnd: HWND) {
+    let dpi = unsafe { GetDpiForSystem() } as i32;
+    let face = wide("Segoe UI");
+    let font = unsafe { CreateFontW(-(9 * dpi / 72), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, face.as_ptr()) } as usize;
+    SETTINGS_FONT.store(font, Ordering::Relaxed);
+    let ui = Ui { hwnd, font, dpi };
+
+    ui.check("Enabled", 16, 12, 200, C_ENABLED);
+    ui.label("Shortcut:", 16, 44, 70, 20, 0);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 90, 40, 170, 24, C_HOTKEY);
+    ui.label("", 270, 44, 190, 20, C_HK_STATUS);
+
+    ui.add("BUTTON", "Direction", BS_GROUPBOX as u32, 0, 12, 74, 456, 50, 0);
+    ui.radio("Auto (word by word)", 24, 94, 160, C_DIR_AUTO, true);
+    ui.radio("Arabic -> English", 190, 94, 130, C_DIR_AR2EN, false);
+    ui.radio("English -> Arabic", 326, 94, 130, C_DIR_EN2AR, false);
+
+    ui.check("Convert the text before the caret when nothing is selected", 16, 136, 440, C_LAST);
+    ui.radio("Last word only", 40, 160, 150, C_LAST_WORD, true);
+    ui.radio("Last words in the same language", 196, 160, 260, C_LAST_RUN, false);
+
+    ui.check("Switch the keyboard language after converting", 16, 190, 440, C_SWITCH);
+    ui.check("Start with Windows", 16, 214, 440, C_STARTUP);
+
+    ui.add("BUTTON", "Try it", BS_GROUPBOX as u32, 0, 12, 244, 456, 92, 0);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 24, 264, 432, 24, C_TRY_IN);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | ES_READONLY as u32, WS_EX_CLIENTEDGE, 24, 298, 432, 24, C_TRY_OUT);
+
+    ui.add("BUTTON", "Save", BS_DEFPUSHBUTTON as u32 | WS_TABSTOP, 0, 292, 350, 84, 28, IDOK as usize);
+    ui.add("BUTTON", "Cancel", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 350, 84, 28, IDCANCEL as usize);
+
+    load_into_dialog(hwnd, &settings());
+}
+
+unsafe extern "system" fn settings_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match msg {
+        WM_COMMAND => {
+            let id = wparam & 0xFFFF;
+            let code = (wparam >> 16) & 0xFFFF;
+            match id {
+                x if x == IDOK as usize => {
+                    if save_from_dialog(hwnd) {
+                        DestroyWindow(hwnd);
+                    }
+                }
+                x if x == IDCANCEL as usize => {
+                    DestroyWindow(hwnd);
+                }
+                C_HOTKEY if code == EN_CHANGE => refresh_hotkey(hwnd),
+                C_TRY_IN if code == EN_CHANGE => refresh_try(hwnd),
+                C_DIR_AUTO | C_DIR_AR2EN | C_DIR_EN2AR if code == BN_CLICKED => refresh_try(hwnd),
+                C_LAST if code == BN_CLICKED => refresh_last_mode(hwnd),
+                _ => {}
+            }
+            0
+        }
+        WM_CLOSE => {
+            DestroyWindow(hwnd);
+            0
+        }
+        WM_DESTROY => {
+            SETTINGS_HWND.store(0, Ordering::Relaxed);
+            let f = SETTINGS_FONT.swap(0, Ordering::Relaxed);
+            if f != 0 {
+                DeleteObject(f as _);
+            }
+            0
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn open_settings() {
+    let existing = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
+    if !existing.is_null() {
+        unsafe {
+            SetForegroundWindow(existing);
+        }
+        return;
+    }
+    unsafe {
+        let hinst = GetModuleHandleW(null());
+        let class_name = wide("BaddelSettingsWindow");
+        let mut wc: WNDCLASSW = std::mem::zeroed();
+        wc.lpfnWndProc = Some(settings_proc);
+        wc.hInstance = hinst;
+        wc.lpszClassName = class_name.as_ptr();
+        wc.hbrBackground = GetSysColorBrush(COLOR_BTNFACE);
+        wc.hIcon = LoadIconW(hinst, 1usize as *const u16);
+        RegisterClassW(&wc); // fails harmlessly when the class already exists
+
+        let dpi = GetDpiForSystem() as i32;
+        let style = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        let mut rc = RECT { left: 0, top: 0, right: 480 * dpi / 96, bottom: 392 * dpi / 96 };
+        AdjustWindowRectEx(&mut rc, style, 0, 0);
+        let (w, h) = (rc.right - rc.left, rc.bottom - rc.top);
+        let x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
+        let y = (GetSystemMetrics(SM_CYSCREEN) - h) / 3;
+        let title = wide("Baddel - Settings");
+        let hwnd = CreateWindowExW(0, class_name.as_ptr(), title.as_ptr(), style, x, y, w, h, null_mut(), null_mut(), hinst, null());
+        if hwnd.is_null() {
+            return;
+        }
+        SETTINGS_HWND.store(hwnd as usize, Ordering::Relaxed);
+        build_settings_window(hwnd);
+        ShowWindow(hwnd, SW_SHOW);
+        SetForegroundWindow(hwnd);
     }
 }
 
@@ -839,6 +1202,10 @@ pub fn run() {
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
+            let dlg = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
+            if !dlg.is_null() && IsDialogMessageW(dlg, &msg) != 0 {
+                continue;
+            }
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }

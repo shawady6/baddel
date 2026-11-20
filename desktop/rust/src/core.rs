@@ -126,25 +126,120 @@ pub fn key_steps(s: &str) -> usize {
     n
 }
 
-/// `sel` is the text between a selection start and the caret. Returns
-/// `(steps_to_unselect, last_token, trailing_whitespace)` where
-/// `steps_to_unselect` is how many Shift+Right presses leave only the last token
-/// (plus the trailing whitespace) selected.
-pub fn split_last_token(sel: &str) -> (usize, String, String) {
-    let core_end = sel.trim_end().len();
-    let (core, trail) = sel.split_at(core_end);
-    let start = core
-        .char_indices()
-        .rev()
-        .find(|(_, c)| c.is_whitespace())
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    let steps = key_steps(&core[..start]);
-    (steps, core[start..].to_string(), trail.to_string())
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LastMode {
+    /// Only the word right before the caret.
+    Word,
+    /// The run of words before the caret that are written in the same script.
+    Run,
 }
 
-pub fn contains_boundary(sel: &str) -> bool {
-    sel.trim_end().chars().any(|c| c.is_whitespace())
+impl LastMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LastMode::Word => "word",
+            LastMode::Run => "run",
+        }
+    }
+    pub fn parse(s: &str) -> LastMode {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "word" => LastMode::Word,
+            _ => LastMode::Run,
+        }
+    }
+}
+
+/// `prefix` is the text from the start of the line up to the caret. Picks what to convert
+/// when nothing is selected. Returns `(steps_to_unselect, unit, trailing_whitespace)`:
+/// `steps_to_unselect` is how many characters of `prefix` stay unconverted.
+pub fn last_unit(prefix: &str, mode: LastMode) -> Option<(usize, String, String)> {
+    let core_end = prefix.trim_end().len();
+    let (core, trail) = prefix.split_at(core_end);
+    if core.is_empty() {
+        return None;
+    }
+    // (byte offset, token) for every whitespace separated token
+    let mut tokens: Vec<(usize, &str)> = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, c) in core.char_indices() {
+        if c.is_whitespace() {
+            if let Some(st) = start.take() {
+                tokens.push((st, &core[st..i]));
+            }
+        } else if start.is_none() {
+            start = Some(i);
+        }
+    }
+    if let Some(st) = start {
+        tokens.push((st, &core[st..]));
+    }
+    let (mut first, last) = (tokens.len() - 1, tokens[tokens.len() - 1].1);
+    if mode == LastMode::Run {
+        if let Some(script) = dominant_script(last) {
+            while first > 0 && dominant_script(tokens[first - 1].1) == Some(script) {
+                first -= 1;
+            }
+        }
+    }
+    let offset = tokens[first].0;
+    Some((key_steps(&core[..offset]), core[offset..].to_string(), trail.to_string()))
+}
+
+/// Reverse of `key_to_vk` for the keys we can show in the settings window.
+pub fn vk_name(vk: u32) -> Option<String> {
+    match vk {
+        0x41..=0x5A => Some(((vk as u8) as char).to_string()),
+        0x30..=0x39 => Some(((vk as u8) as char).to_string()),
+        0x70..=0x87 => Some(format!("F{}", vk - 0x6F)),
+        0xBA => Some(";".into()),
+        0xBB => Some("=".into()),
+        0xBC => Some(",".into()),
+        0xBD => Some("-".into()),
+        0xBE => Some(".".into()),
+        0xBF => Some("/".into()),
+        0xC0 => Some("`".into()),
+        0xDB => Some("[".into()),
+        0xDC => Some("\\".into()),
+        0xDD => Some("]".into()),
+        0xDE => Some("'".into()),
+        0x20 => Some("Space".into()),
+        0x0D => Some("Enter".into()),
+        0x09 => Some("Tab".into()),
+        0x1B => Some("Esc".into()),
+        0x08 => Some("Backspace".into()),
+        0x2E => Some("Delete".into()),
+        0x2D => Some("Insert".into()),
+        0x24 => Some("Home".into()),
+        0x23 => Some("End".into()),
+        0x21 => Some("PageUp".into()),
+        0x22 => Some("PageDown".into()),
+        0x26 => Some("Up".into()),
+        0x28 => Some("Down".into()),
+        0x25 => Some("Left".into()),
+        0x27 => Some("Right".into()),
+        _ => None,
+    }
+}
+
+pub fn hotkey_text(mods: u32, vk: u32) -> Option<String> {
+    let key = vk_name(vk)?;
+    let mut parts: Vec<&str> = Vec::new();
+    if mods & MOD_CONTROL != 0 {
+        parts.push("Ctrl");
+    }
+    if mods & MOD_ALT != 0 {
+        parts.push("Alt");
+    }
+    if mods & MOD_SHIFT != 0 {
+        parts.push("Shift");
+    }
+    if mods & MOD_WIN != 0 {
+        parts.push("Win");
+    }
+    if parts.is_empty() {
+        return None;
+    }
+    Some(format!("{}+{}", parts.join("+"), key))
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +380,7 @@ pub struct Settings {
     pub enabled: bool,
     pub direction: Direction,
     pub last_word: bool,
+    pub last_mode: LastMode,
     pub switch_lang: bool,
     pub hotkey: String,
 }
@@ -295,6 +391,7 @@ impl Default for Settings {
             enabled: true,
             direction: Direction::Auto,
             last_word: true,
+            last_mode: LastMode::Run,
             switch_lang: false,
             hotkey: DEFAULT_HOTKEY.to_string(),
         }
@@ -323,6 +420,7 @@ impl Settings {
                 "enabled" => s.enabled = parse_bool(v, s.enabled),
                 "direction" => s.direction = Direction::parse(v),
                 "last_word" => s.last_word = parse_bool(v, s.last_word),
+                "last_mode" => s.last_mode = LastMode::parse(v),
                 "switch_language" => s.switch_lang = parse_bool(v, s.switch_lang),
                 "hotkey" => {
                     if parse_hotkey(v).is_some() {
@@ -345,11 +443,14 @@ impl Settings {
              direction={}\r\n\
              enabled={}\r\n\
              last_word={}\r\n\
+             # last_mode: run (the words before the caret in the same language) or word (just one)\r\n\
+             last_mode={}\r\n\
              switch_language={}\r\n",
             self.hotkey,
             self.direction.as_str(),
             b(self.enabled),
             b(self.last_word),
+            self.last_mode.as_str(),
             b(self.switch_lang),
         )
     }
@@ -390,18 +491,9 @@ mod tests {
     }
 
     #[test]
-    fn last_token_split() {
-        // "مرحبا hgsghl " with the caret after the trailing space
-        let (steps, tok, trail) = split_last_token("مرحبا hgsghl ");
-        assert_eq!(tok, "hgsghl");
-        assert_eq!(trail, " ");
-        assert_eq!(steps, 6); // "مرحبا " = 5 letters + space
-        let (steps, tok, trail) = split_last_token("word");
-        assert_eq!((steps, tok.as_str(), trail.as_str()), (0, "word", ""));
-        let (steps, tok, _) = split_last_token("a\r\nbc");
-        assert_eq!((steps, tok.as_str()), (2, "bc")); // 'a' + CRLF
-        assert!(contains_boundary("a b"));
-        assert!(!contains_boundary("ab "));
+    fn last_unit_after_line_break() {
+        let (steps, unit, _) = last_unit("a\r\nbc", LastMode::Word).unwrap();
+        assert_eq!((steps, unit.as_str()), (2, "bc"));
     }
 
     #[test]
@@ -435,6 +527,7 @@ mod tests {
             enabled: false,
             direction: Direction::EnToAr,
             last_word: false,
+            last_mode: LastMode::Word,
             switch_lang: true,
             hotkey: "Ctrl+Alt+Shift+K".into(),
         };
@@ -443,5 +536,34 @@ mod tests {
         // a broken hotkey keeps the default instead of disabling the app
         assert_eq!(Settings::parse("hotkey=nonsense").hotkey, DEFAULT_HOTKEY);
         assert!(Settings::parse("\u{feff}enabled=0").enabled == false);
+    }
+
+    #[test]
+    fn last_unit_word_and_run() {
+        // Arabic word, then two Latin words typed with the wrong layout
+        let p = "مرحبا hgsghl ugd;l ";
+        let (steps, unit, trail) = last_unit(p, LastMode::Run).unwrap();
+        assert_eq!((unit.as_str(), trail.as_str()), ("hgsghl ugd;l", " "));
+        assert_eq!(steps, 6);
+        let (steps, unit, _) = last_unit(p, LastMode::Word).unwrap();
+        assert_eq!((unit.as_str(), steps), ("ugd;l", 13));
+        // a single word, caret right after it
+        let (steps, unit, trail) = last_unit("hgsghl", LastMode::Run).unwrap();
+        assert_eq!((steps, unit.as_str(), trail.as_str()), (0, "hgsghl", ""));
+        // numbers do not break a run on their own but never start one
+        assert_eq!(last_unit("   ", LastMode::Run), None);
+        assert_eq!(last_unit("", LastMode::Run), None);
+        // run stops at a token written in the other script
+        let (_, unit, _) = last_unit("hello مرحبا اثممخ", LastMode::Run).unwrap();
+        assert_eq!(unit, "مرحبا اثممخ");
+    }
+
+    #[test]
+    fn hotkey_text_roundtrip() {
+        for text in ["Ctrl+Shift+X", "Ctrl+Alt+Shift+Win+K", "Ctrl+\\", "Ctrl+F12", "Alt+Space"] {
+            let hk = parse_hotkey(text).unwrap();
+            assert_eq!(hotkey_text(hk.mods, hk.vk).unwrap(), format_hotkey(text));
+        }
+        assert_eq!(hotkey_text(0, 0x58), None);
     }
 }
