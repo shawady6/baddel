@@ -24,7 +24,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT,
 };
 use windows_sys::Win32::UI::Shell::{
-    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE,
+    DefSubclassProc, SetWindowSubclass, ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE,
     NIM_MODIFY, NOTIFYICONDATAW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -37,7 +37,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetDlgItemTextW, GetSystemMetrics, IsDialogMessageW, MessageBoxW, SendMessageW,
     SetDlgItemTextW, ShowWindow, BS_AUTOCHECKBOX, BS_AUTORADIOBUTTON, BS_DEFPUSHBUTTON, BS_GROUPBOX,
     BS_PUSHBUTTON, ES_AUTOHSCROLL, ES_READONLY, IDCANCEL, IDOK, MB_ICONWARNING, MB_OK, SM_CXSCREEN, SM_CYSCREEN,
-    SW_SHOW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
+    SW_SHOW, WM_CHAR, WM_KEYDOWN, WM_SYSCHAR, WM_SYSKEYDOWN, SetWindowTextW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
     WS_MINIMIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows_sys::Win32::Graphics::Gdi::{CreateFontW, DeleteObject, GetSysColorBrush, COLOR_BTNFACE};
@@ -983,7 +983,7 @@ fn refresh_hotkey(hwnd: HWND) {
     let text = dlg_text(hwnd, C_HOTKEY);
     let msg = match parse_hotkey(&text) {
         Some(hk) => format!("OK  {}", hotkey_text(hk.mods, hk.vk).unwrap_or_else(|| format_hotkey(&text))),
-        None => "Not valid. Example: Ctrl+Shift+X".to_string(),
+        None => "Click the box and press the keys".to_string(),
     };
     set_dlg_text(hwnd, C_HK_STATUS, &msg);
 }
@@ -1059,8 +1059,11 @@ fn build_settings_window(hwnd: HWND) {
 
     ui.check("Enabled", 16, 12, 200, C_ENABLED);
     ui.label("Shortcut:", 16, 44, 70, 20, 0);
-    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 90, 40, 170, 24, C_HOTKEY);
-    ui.label("", 270, 44, 190, 20, C_HK_STATUS);
+    let hk = ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 90, 40, 170, 24, C_HOTKEY);
+    unsafe {
+        SetWindowSubclass(hk, Some(hotkey_capture), 1, 0);
+    }
+    ui.label("", 270, 44, 200, 20, C_HK_STATUS);
 
     ui.add("BUTTON", "Direction", BS_GROUPBOX as u32, 0, 12, 74, 456, 50, 0);
     ui.radio("Auto (word by word)", 24, 94, 160, C_DIR_AUTO, true);
@@ -1082,6 +1085,62 @@ fn build_settings_window(hwnd: HWND) {
     ui.add("BUTTON", "Cancel", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 350, 84, 28, IDCANCEL as usize);
 
     load_into_dialog(hwnd, &settings());
+}
+
+/// The shortcut box records the keys you press instead of taking typed text.
+unsafe extern "system" fn hotkey_capture(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    _data: usize,
+) -> LRESULT {
+    match msg {
+        WM_KEYDOWN | WM_SYSKEYDOWN => {
+            let vk = wparam as u32;
+            let mut mods = 0u32;
+            if is_down(VK_CONTROL as i32) {
+                mods |= 2;
+            }
+            if is_down(VK_MENU as i32) {
+                mods |= 1;
+            }
+            if is_down(VK_SHIFT as i32) {
+                mods |= 4;
+            }
+            if is_down(VK_LWIN as i32) || is_down(VK_RWIN as i32) {
+                mods |= 8;
+            }
+            if matches!(vk, 0x10 | 0x11 | 0x12 | 0x5B | 0x5C | 0xA0..=0xA5) {
+                // only modifiers so far: show them, waiting for the main key
+                let mut parts: Vec<&str> = Vec::new();
+                if mods & 2 != 0 {
+                    parts.push("Ctrl");
+                }
+                if mods & 1 != 0 {
+                    parts.push("Alt");
+                }
+                if mods & 4 != 0 {
+                    parts.push("Shift");
+                }
+                if mods & 8 != 0 {
+                    parts.push("Win");
+                }
+                let w = wide(&format!("{}+", parts.join("+")));
+                SetWindowTextW(hwnd, w.as_ptr());
+            } else if let Some(text) = hotkey_text(mods, vk) {
+                let w = wide(&text);
+                SetWindowTextW(hwnd, w.as_ptr());
+            } else if mods == 0 && (0x70..=0x87).contains(&vk) {
+                let w = wide(&format!("F{}", vk - 0x6F));
+                SetWindowTextW(hwnd, w.as_ptr());
+            }
+            0
+        }
+        WM_CHAR | WM_SYSCHAR => 0,
+        _ => DefSubclassProc(hwnd, msg, wparam, lparam),
+    }
 }
 
 unsafe extern "system" fn settings_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
