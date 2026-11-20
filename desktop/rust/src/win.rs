@@ -19,7 +19,7 @@ use windows_sys::Win32::System::Registry::{
 };
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetAsyncKeyState, GetKeyboardLayoutList, HKL, RegisterHotKey, SendInput, UnregisterHotKey, INPUT, INPUT_0, INPUT_KEYBOARD,
+    EnableWindow, GetAsyncKeyState, GetKeyboardLayoutList, MapVirtualKeyExW, HKL, RegisterHotKey, SendInput, UnregisterHotKey, INPUT, INPUT_0, INPUT_KEYBOARD,
     KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_NOREPEAT, VK_CONTROL, VK_HOME, VK_LEFT, VK_LWIN,
     VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT,
 };
@@ -37,7 +37,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetDlgItemTextW, GetSystemMetrics, IsDialogMessageW, MessageBoxW, SendMessageW,
     SetDlgItemTextW, ShowWindow, BS_AUTOCHECKBOX, BS_AUTORADIOBUTTON, BS_DEFPUSHBUTTON, BS_GROUPBOX,
     BS_PUSHBUTTON, ES_AUTOHSCROLL, ES_READONLY, IDCANCEL, IDOK, MB_ICONWARNING, MB_OK, SM_CXSCREEN, SM_CYSCREEN,
-    SW_SHOW, WM_CHAR, WM_KEYDOWN, WM_SYSCHAR, WM_SYSKEYDOWN, SetWindowTextW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
+    SW_SHOW, KillTimer, SetTimer, WM_TIMER, WM_CHAR, WM_KEYDOWN, WM_SYSCHAR, WM_SYSKEYDOWN, SetWindowTextW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
     WS_MINIMIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows_sys::Win32::Graphics::Gdi::{CreateFontW, DeleteObject, GetSysColorBrush, COLOR_BTNFACE};
@@ -56,6 +56,8 @@ const WEBSITE: &str = "https://shawady6.github.io/baddel/";
 const WM_TRAY: u32 = WM_APP + 1;
 const WM_INPUTLANGCHANGEREQUEST: u32 = 0x0050;
 const HOTKEY_ID: i32 = 1;
+const HOTKEY_SLOTS: i32 = 16;
+const TIMER_LAYOUTS: usize = 77;
 const CF_UNICODETEXT: u32 = 13;
 
 // menu command ids
@@ -262,9 +264,10 @@ fn is_down(vk: i32) -> bool {
 
 /// Wait until the shortcut keys are physically released, otherwise our own Ctrl+C
 /// would arrive as Ctrl+Shift+C and so on.
-fn wait_release(main_vk: u32) {
+fn wait_release(main_vks: &[u32]) {
     let start = Instant::now();
-    let watched = [VK_CONTROL as i32, VK_SHIFT as i32, VK_MENU as i32, VK_LWIN as i32, VK_RWIN as i32, main_vk as i32];
+    let mut watched = vec![VK_CONTROL as i32, VK_SHIFT as i32, VK_MENU as i32, VK_LWIN as i32, VK_RWIN as i32];
+    watched.extend(main_vks.iter().map(|v| *v as i32));
     while start.elapsed() < Duration::from_millis(1500) {
         if !watched.iter().any(|vk| is_down(*vk)) {
             return;
@@ -634,7 +637,7 @@ fn do_fix() {
         return;
     }
     if let Some(hk) = parse_hotkey(&s.hotkey) {
-        wait_release(hk.vk);
+        wait_release(&hotkey_vks(hk.vk));
     }
     let saved = save_clipboard();
     fix_inner(&s);
@@ -768,19 +771,89 @@ fn open_shell(target: &str, params: Option<&str>) {
     }
 }
 
-fn register_hotkey(hwnd: HWND) {
-    let s = settings();
+fn layout_list() -> Vec<HKL> {
     unsafe {
-        UnregisterHotKey(hwnd, HOTKEY_ID);
+        let n = GetKeyboardLayoutList(0, null_mut());
+        if n < 1 {
+            return Vec::new();
+        }
+        let mut list: Vec<HKL> = vec![null_mut(); n as usize];
+        let got = GetKeyboardLayoutList(n, list.as_mut_ptr());
+        list.truncate(got.max(0) as usize);
+        list
     }
-    match parse_hotkey(&s.hotkey) {
-        Some(hk) => {
-            let ok = unsafe { RegisterHotKey(hwnd, HOTKEY_ID, hk.mods | MOD_NOREPEAT, hk.vk) };
-            if ok == 0 {
-                balloon("Baddel", &format!("{} is already used by another program. Pick another shortcut from the tray menu.", s.hotkey));
+}
+
+/// The US English layout when it is installed, otherwise the first layout.
+fn us_layout() -> HKL {
+    let list = layout_list();
+    list.iter()
+        .copied()
+        .find(|h| (*h as usize) & 0xFFFF == 0x0409)
+        .or_else(|| list.first().copied())
+        .unwrap_or(null_mut())
+}
+
+/// Shortcuts are stored as US layout keys. On other layouts (Arabic, ...) the same physical key
+/// reports a different virtual-key code, so find every code that key can produce.
+fn hotkey_vks(vk: u32) -> Vec<u32> {
+    let mut out = vec![vk];
+    let us = us_layout();
+    if us.is_null() {
+        return out;
+    }
+    unsafe {
+        let sc = MapVirtualKeyExW(vk, 0, us); // VK -> scan code
+        if sc == 0 {
+            return out;
+        }
+        for hkl in layout_list() {
+            let v = MapVirtualKeyExW(sc, 1, hkl); // scan code -> VK
+            if v != 0 && !out.contains(&v) && out.len() < HOTKEY_SLOTS as usize {
+                out.push(v);
             }
         }
-        None => balloon("Baddel", "The shortcut in the settings file is not valid."),
+    }
+    out
+}
+
+fn layout_signature() -> Vec<usize> {
+    layout_list().iter().map(|h| *h as usize).collect()
+}
+
+static LAYOUT_SIG: Mutex<Vec<usize>> = Mutex::new(Vec::new());
+
+fn register_hotkey(hwnd: HWND) {
+    register_hotkey_ex(hwnd, true);
+}
+
+fn register_hotkey_ex(hwnd: HWND, announce: bool) {
+    let s = settings();
+    unsafe {
+        for i in 0..HOTKEY_SLOTS {
+            UnregisterHotKey(hwnd, HOTKEY_ID + i);
+        }
+    }
+    *LAYOUT_SIG.lock().unwrap() = layout_signature();
+    match parse_hotkey(&s.hotkey) {
+        Some(hk) => {
+            let vks = hotkey_vks(hk.vk);
+            let mut main_ok = false;
+            for (i, vk) in vks.iter().enumerate() {
+                let ok = unsafe { RegisterHotKey(hwnd, HOTKEY_ID + i as i32, hk.mods | MOD_NOREPEAT, *vk) };
+                if i == 0 {
+                    main_ok = ok != 0;
+                }
+            }
+            if !main_ok && announce {
+                balloon("Baddel", &format!("{} is already used by another program. Pick another shortcut in Settings.", s.hotkey));
+            }
+        }
+        None => {
+            if announce {
+                balloon("Baddel", "The shortcut in the settings file is not valid.");
+            }
+        }
     }
 }
 
@@ -845,6 +918,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             do_fix();
             0
         }
+        WM_TIMER if wparam == TIMER_LAYOUTS => {
+            // the user installed or removed a keyboard layout: refresh the shortcut keys
+            if *LAYOUT_SIG.lock().unwrap() != layout_signature() {
+                register_hotkey_ex(hwnd, false);
+            }
+            0
+        }
         WM_TRAY => {
             let event = (lparam as u32) & 0xFFFF;
             if event == WM_LBUTTONDBLCLK {
@@ -860,7 +940,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_DESTROY => {
             remove_tray(hwnd);
-            UnregisterHotKey(hwnd, HOTKEY_ID);
+            for i in 0..HOTKEY_SLOTS {
+                UnregisterHotKey(hwnd, HOTKEY_ID + i);
+            }
+            KillTimer(hwnd, TIMER_LAYOUTS);
             PostQuitMessage(0);
             0
         }
@@ -1098,7 +1181,18 @@ unsafe extern "system" fn hotkey_capture(
 ) -> LRESULT {
     match msg {
         WM_KEYDOWN | WM_SYSKEYDOWN => {
-            let vk = wparam as u32;
+            let mut vk = wparam as u32;
+            if !matches!(vk, 0x10 | 0x11 | 0x12 | 0x5B | 0x5C | 0xA0..=0xA5) {
+                // other layouts report other codes for the same physical key: use the US meaning
+                let sc = ((lparam >> 16) & 0xFF) as u32;
+                let us = us_layout();
+                if sc != 0 && !us.is_null() {
+                    let v = MapVirtualKeyExW(sc, 1, us);
+                    if v != 0 {
+                        vk = v;
+                    }
+                }
+            }
             let mut mods = 0u32;
             if is_down(VK_CONTROL as i32) {
                 mods |= 2;
@@ -1258,6 +1352,7 @@ pub fn run() {
 
         add_tray(hwnd);
         register_hotkey(hwnd);
+        SetTimer(hwnd, TIMER_LAYOUTS, 5000, None);
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
