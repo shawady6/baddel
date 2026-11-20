@@ -11,6 +11,7 @@
     lead: "Type as usual. If the text comes out in the wrong language (like <code dir=\"ltr\">hgsghl</code> instead of «السلام»), press one shortcut to fix it, in any program.",
     dl_win: "Download for Windows",
     platforms: "Windows 10 and 11. Small, fast, no internet needed.",
+    share: "Send the link to yourself", shared: "Link copied ✓",
     notwin: "The app runs on Windows only. Open this page on a Windows computer to download it.",
     demo_h: "Try it now",
     demo_sub: "Type or paste text in the wrong language and see the result instantly.",
@@ -83,7 +84,21 @@
     })();
   })();
 
-  if (!/Windows/i.test(navigator.userAgent)) $("#notwin").hidden = false;
+  if (!/Windows/i.test(navigator.userAgent)) {
+    $("#notwin").hidden = false;
+    $("#dlwin").parentElement.hidden = true;
+    const shareBtn = $("#share");
+    shareBtn.addEventListener("click", async () => {
+      const url = location.href.split("#")[0];
+      try {
+        if (navigator.share) { await navigator.share({ title: "Baddel", url }); return; }
+        await navigator.clipboard.writeText(url);
+        const span = shareBtn.firstElementChild, old = span.textContent;
+        span.textContent = lang === "ar" ? "اتنسخ ✓" : "Link copied ✓";
+        setTimeout(() => { span.textContent = old; }, 1600);
+      } catch (e) { /* user cancelled or clipboard blocked */ }
+    });
+  }
 
   let saved = null;
   try { saved = localStorage.getItem("baddel-lang"); } catch (e) { /* ignore */ }

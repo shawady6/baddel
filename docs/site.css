@@ -219,3 +219,23 @@ kbd {
   .cta .btn { width: 100%; justify-content: center; }
   .card .actions .btn { width: 100%; justify-content: center; }
 }
+
+.notice { display: grid; gap: 10px; }
+.notice p { margin: 0; }
+.btn.share { background: var(--card); color: var(--text); border: 1px solid var(--line); justify-self: start; }
+@media (max-width: 520px) {
+  .hero { padding-top: 24px; gap: 24px; padding-bottom: 16px; }
+  .hero h1 { font-size: 28px; }
+  .lead { font-size: 16px; margin-top: 12px; }
+  .section { padding-top: 36px; }
+  .section h2 { font-size: 24px; }
+  .try textarea { min-height: 96px; }
+  .chip { padding: 10px 14px; min-height: 40px; }
+  .btn, .btn.sm { min-height: 46px; }
+  .btn.share { justify-self: stretch; justify-content: center; }
+  .card { padding: 18px; }
+  .faq summary { padding: 16px; min-height: 48px; }
+  .foot { margin-top: 40px; }
+  .foot-in { flex-direction: column; }
+}
+[hidden] { display: none !important; }
