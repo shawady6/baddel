@@ -12,6 +12,7 @@ use windows_sys::Win32::System::DataExchange::{
     OpenClipboard, SetClipboardData,
 };
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::System::SystemInformation::GetLocalTime;
 use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE};
 use windows_sys::Win32::System::Registry::{
     RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
@@ -19,7 +20,7 @@ use windows_sys::Win32::System::Registry::{
 };
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetAsyncKeyState, GetKeyboardLayoutList, MapVirtualKeyExW, HKL, RegisterHotKey, SendInput, UnregisterHotKey, INPUT, INPUT_0, INPUT_KEYBOARD,
+    EnableWindow, SetFocus, GetAsyncKeyState, GetKeyboardLayoutList, MapVirtualKeyExW, HKL, RegisterHotKey, SendInput, UnregisterHotKey, INPUT, INPUT_0, INPUT_KEYBOARD,
     KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_NOREPEAT, VK_CONTROL, VK_HOME, VK_LEFT, VK_LWIN,
     VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT,
 };
@@ -37,7 +38,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetDlgItemTextW, GetSystemMetrics, IsDialogMessageW, MessageBoxW, SendMessageW,
     SetDlgItemTextW, ShowWindow, BS_AUTOCHECKBOX, BS_AUTORADIOBUTTON, BS_DEFPUSHBUTTON, BS_GROUPBOX,
     BS_PUSHBUTTON, ES_AUTOHSCROLL, ES_READONLY, IDCANCEL, IDOK, MB_ICONWARNING, MB_OK, SM_CXSCREEN, SM_CYSCREEN,
-    SW_SHOW, KillTimer, SetTimer, WM_TIMER, WM_CHAR, WM_KEYDOWN, WM_SYSCHAR, WM_SYSKEYDOWN, SetWindowTextW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
+    SW_SHOW, LBS_NOTIFY, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, ES_AUTOVSCROLL, ES_MULTILINE,
+    ES_WANTRETURN, WS_VSCROLL, KillTimer, SetTimer, WM_TIMER, WM_CHAR, WM_KEYDOWN, WM_SYSCHAR, WM_SYSKEYDOWN, SetWindowTextW, WM_CLOSE, WM_LBUTTONDBLCLK, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_GROUP,
     WS_MINIMIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows_sys::Win32::Graphics::Gdi::{CreateFontW, DeleteObject, GetSysColorBrush, COLOR_BTNFACE};
@@ -46,8 +48,9 @@ use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
 use windows_sys::Win32::Foundation::RECT;
 
 use crate::core::{
-    convert, convert_digits, dominant_script, format_hotkey, hotkey_text, key_steps, last_unit, parse_hotkey, Direction, LastMode,
-    Script, Settings, DEFAULT_HOTKEY,
+    convert, convert_digits, dominant_script, expand_placeholders, find_snippet, format_hotkey, hotkey_text, key_steps,
+    last_unit, lookup_snippet, parse_hotkey, parse_snippets, serialize_snippets, Direction, LastMode, Script, Settings,
+    Snippet, DEFAULT_HOTKEY,
 };
 
 const APP_NAME: &str = "Baddel";
@@ -58,11 +61,13 @@ const WM_INPUTLANGCHANGEREQUEST: u32 = 0x0050;
 const HOTKEY_ID: i32 = 1;
 const HOTKEY_SLOTS: i32 = 16;
 const DIGITS_ID: i32 = 100; // second shortcut (digits) uses ids 100..116
+const SNIPPET_ID: i32 = 200; // third shortcut (snippets) uses ids 200..216
 const TIMER_LAYOUTS: usize = 77;
 const CF_UNICODETEXT: u32 = 13;
 
 // menu command ids
 const ID_SETTINGS: usize = 1000;
+const ID_SNIPPETS: usize = 1005;
 const ID_ENABLED: usize = 1001;
 const ID_LASTWORD: usize = 1002;
 const ID_SWITCHLANG: usize = 1003;
@@ -93,6 +98,7 @@ struct Undo {
 
 struct App {
     settings: Settings,
+    snippets: Vec<Snippet>,
     undo: Option<Undo>,
 }
 
@@ -139,6 +145,46 @@ fn save_settings(s: &Settings) {
         let _ = std::fs::create_dir_all(dir);
     }
     let _ = std::fs::write(&path, s.serialize());
+}
+
+fn snippets_path() -> String {
+    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
+    format!("{}\\{}\\snippets.txt", base, APP_NAME)
+}
+
+fn load_snippets() -> Vec<Snippet> {
+    std::fs::read_to_string(snippets_path()).map(|t| parse_snippets(&t)).unwrap_or_default()
+}
+
+fn snippets() -> Vec<Snippet> {
+    APP.lock().unwrap().as_ref().map(|a| a.snippets.clone()).unwrap_or_default()
+}
+
+fn update_snippets<F: FnOnce(&mut Vec<Snippet>)>(f: F) {
+    let list = {
+        let mut guard = APP.lock().unwrap();
+        match guard.as_mut() {
+            Some(app) => {
+                f(&mut app.snippets);
+                app.snippets.clone()
+            }
+            None => return,
+        }
+    };
+    let path = snippets_path();
+    if let Some(dir) = std::path::Path::new(&path).parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&path, serialize_snippets(&list));
+}
+
+fn now_strings() -> (String, String) {
+    let t = unsafe {
+        let mut t: windows_sys::Win32::Foundation::SYSTEMTIME = std::mem::zeroed();
+        GetLocalTime(&mut t);
+        t
+    };
+    (format!("{:04}-{:02}-{:02}", t.wYear, t.wMonth, t.wDay), format!("{:02}:{:02}", t.wHour, t.wMinute))
 }
 
 fn sleep_ms(ms: u64) {
@@ -420,7 +466,8 @@ fn copy_selection() -> Option<String> {
 }
 
 fn paste_text(text: &str) -> bool {
-    if !write_clipboard_text(text) {
+    let text = text.replace("\r\n", "\n").replace('\n', "\r\n");
+    if !write_clipboard_text(&text) {
         return false;
     }
     chord(&[VK_CONTROL, b'V' as u16]);
@@ -583,6 +630,8 @@ struct Action<'a> {
     conv: &'a dyn Fn(&str) -> String,
     mode: LastMode,
     switch: bool,
+    /// Snippet mode: the unit before the caret is the snippet trigger, found in the list.
+    snip: bool,
 }
 
 fn fix_inner(s: &Settings, act: &Action) {
@@ -608,7 +657,12 @@ fn fix_inner(s: &Settings, act: &Action) {
                 return;
             }
             let Some(prefix) = select_line_prefix() else { return };
-            let Some((steps, unit, trail)) = last_unit(&prefix, act.mode) else {
+            let found = if act.snip {
+                find_snippet(&prefix, &snippets())
+            } else {
+                last_unit(&prefix, act.mode)
+            };
+            let Some((steps, unit, trail)) = found else {
                 collapse(guess_dir(&prefix));
                 return;
             };
@@ -639,21 +693,36 @@ fn fix_inner(s: &Settings, act: &Action) {
     }
 }
 
-fn do_action(digits: bool) {
+/// kind: 0 = fix the keyboard language, 1 = digits, 2 = snippets
+fn do_action(kind: i32) {
     let s = settings();
     if !s.enabled {
         return;
     }
-    let text = if digits { &s.digits_hotkey } else { &s.hotkey };
+    let text = match kind {
+        1 => &s.digits_hotkey,
+        2 => &s.snippets_hotkey,
+        _ => &s.hotkey,
+    };
     if let Some(hk) = parse_hotkey(text) {
         wait_release(&hotkey_vks(hk.vk));
     }
     let saved = save_clipboard();
-    if digits {
-        fix_inner(&s, &Action { conv: &convert_digits, mode: LastMode::Word, switch: false });
-    } else {
-        let dir = s.direction;
-        fix_inner(&s, &Action { conv: &move |t: &str| convert(t, dir), mode: s.last_mode, switch: true });
+    match kind {
+        1 => fix_inner(&s, &Action { conv: &convert_digits, mode: LastMode::Word, switch: false, snip: false }),
+        2 => {
+            let list = snippets();
+            let (date, time) = now_strings();
+            let conv = |t: &str| match lookup_snippet(t, &list) {
+                Some(i) => expand_placeholders(&list[i].text, &date, &time),
+                None => t.to_string(),
+            };
+            fix_inner(&s, &Action { conv: &conv, mode: LastMode::Word, switch: false, snip: true });
+        }
+        _ => {
+            let dir = s.direction;
+            fix_inner(&s, &Action { conv: &move |t: &str| convert(t, dir), mode: s.last_mode, switch: true, snip: false });
+        }
     }
     restore_clipboard(saved);
 }
@@ -735,6 +804,7 @@ fn show_menu(hwnd: HWND) {
 
         append(menu, MF_STRING | 0x1, 0, &format!("Baddel  ({})", s.hotkey)); // 0x1 = MF_GRAYED
         append(menu, MF_STRING, ID_SETTINGS, "Settings...");
+        append(menu, MF_STRING, ID_SNIPPETS, "Snippets...");
         append(menu, MF_SEPARATOR, 0, "");
         append(menu, flag(s.enabled), ID_ENABLED, "Enabled");
 
@@ -847,10 +917,15 @@ fn register_hotkey_ex(hwnd: HWND, announce: bool) {
         for i in 0..HOTKEY_SLOTS {
             UnregisterHotKey(hwnd, HOTKEY_ID + i);
             UnregisterHotKey(hwnd, DIGITS_ID + i);
+            UnregisterHotKey(hwnd, SNIPPET_ID + i);
         }
     }
     *LAYOUT_SIG.lock().unwrap() = layout_signature();
-    for (text, base, name) in [(s.hotkey.as_str(), HOTKEY_ID, "shortcut"), (s.digits_hotkey.as_str(), DIGITS_ID, "digits shortcut")] {
+    for (text, base, name) in [
+        (s.hotkey.as_str(), HOTKEY_ID, "shortcut"),
+        (s.digits_hotkey.as_str(), DIGITS_ID, "digits shortcut"),
+        (s.snippets_hotkey.as_str(), SNIPPET_ID, "snippets shortcut"),
+    ] {
         if text.is_empty() {
             continue; // the digits shortcut is optional
         }
@@ -893,6 +968,7 @@ fn update_settings<F: FnOnce(&mut Settings)>(f: F) {
 fn on_command(hwnd: HWND, id: usize) {
     match id {
         ID_SETTINGS => open_settings(),
+        ID_SNIPPETS => open_snippets(),
         ID_ENABLED => update_settings(|s| s.enabled = !s.enabled),
         ID_LASTWORD => update_settings(|s| s.last_word = !s.last_word),
         ID_SWITCHLANG => update_settings(|s| s.switch_lang = !s.switch_lang),
@@ -911,8 +987,10 @@ fn on_command(hwnd: HWND, id: usize) {
         }
         ID_RELOAD => {
             let fresh = load_settings();
+            let fresh_snippets = load_snippets();
             if let Some(app) = APP.lock().unwrap().as_mut() {
                 app.settings = fresh;
+                app.snippets = fresh_snippets;
             }
             register_hotkey(hwnd);
             balloon("Baddel", &format!("Settings reloaded. Shortcut: {}", settings().hotkey));
@@ -934,7 +1012,7 @@ fn on_command(hwnd: HWND, id: usize) {
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_HOTKEY => {
-            do_action(wparam as i32 >= DIGITS_ID);
+            do_action(if wparam as i32 >= SNIPPET_ID { 2 } else if wparam as i32 >= DIGITS_ID { 1 } else { 0 });
             0
         }
         WM_TIMER if wparam == TIMER_LAYOUTS => {
@@ -962,6 +1040,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             for i in 0..HOTKEY_SLOTS {
                 UnregisterHotKey(hwnd, HOTKEY_ID + i);
                 UnregisterHotKey(hwnd, DIGITS_ID + i);
+                UnregisterHotKey(hwnd, SNIPPET_ID + i);
             }
             KillTimer(hwnd, TIMER_LAYOUTS);
             PostQuitMessage(0);
@@ -988,6 +1067,9 @@ const C_HOTKEY: usize = 2002;
 const C_HK_STATUS: usize = 2003;
 const C_DIGITS: usize = 2004;
 const C_DG_STATUS: usize = 2005;
+const C_SNIPPETS: usize = 2006;
+const C_SN_STATUS: usize = 2007;
+const C_SN_EDIT: usize = 2008;
 const C_DIR_AUTO: usize = 2010;
 const C_DIR_AR2EN: usize = 2011;
 const C_DIR_EN2AR: usize = 2012;
@@ -1106,6 +1188,18 @@ fn refresh_digits(hwnd: HWND) {
     set_dlg_text(hwnd, C_DG_STATUS, &msg);
 }
 
+fn refresh_snippets(hwnd: HWND) {
+    let text = dlg_text(hwnd, C_SNIPPETS);
+    let msg = if text.trim().is_empty() {
+        "Off"
+    } else if parse_hotkey(&text).is_some() {
+        "OK"
+    } else {
+        "Press the keys"
+    };
+    set_dlg_text(hwnd, C_SN_STATUS, msg);
+}
+
 fn refresh_last_mode(hwnd: HWND) {
     let on = checked(hwnd, C_LAST);
     unsafe {
@@ -1118,6 +1212,7 @@ fn load_into_dialog(hwnd: HWND, s: &Settings) {
     set_checked(hwnd, C_ENABLED, s.enabled);
     set_dlg_text(hwnd, C_HOTKEY, &s.hotkey);
     set_dlg_text(hwnd, C_DIGITS, &s.digits_hotkey);
+    set_dlg_text(hwnd, C_SNIPPETS, &s.snippets_hotkey);
     unsafe {
         let id = match s.direction {
             Direction::Auto => C_DIR_AUTO,
@@ -1134,6 +1229,7 @@ fn load_into_dialog(hwnd: HWND, s: &Settings) {
     set_dlg_text(hwnd, C_TRY_IN, "hgsghl ugd;l");
     refresh_hotkey(hwnd);
     refresh_digits(hwnd);
+    refresh_snippets(hwnd);
     refresh_last_mode(hwnd);
     refresh_try(hwnd);
 }
@@ -1165,6 +1261,24 @@ fn save_from_dialog(hwnd: HWND) -> bool {
             return false;
         }
     }
+    let sn_text = dlg_text(hwnd, C_SNIPPETS).trim().to_string();
+    if !sn_text.is_empty() {
+        let bad = match parse_hotkey(&sn_text) {
+            None => Some("The snippets shortcut is not valid.\nPress the keys you want, or press Backspace to turn it off."),
+            Some(_) if format_hotkey(&sn_text) == format_hotkey(&hk_text) || (!dg_text.is_empty() && format_hotkey(&sn_text) == format_hotkey(&dg_text)) => {
+                Some("The snippets shortcut must be different from the other shortcuts.")
+            }
+            Some(_) => None,
+        };
+        if let Some(msg) = bad {
+            let t = wide(msg);
+            let c = wide("Baddel");
+            unsafe {
+                MessageBoxW(hwnd, t.as_ptr(), c.as_ptr(), MB_OK | MB_ICONWARNING);
+            }
+            return false;
+        }
+    }
     let direction = dialog_direction(hwnd);
     let enabled = checked(hwnd, C_ENABLED);
     let last = checked(hwnd, C_LAST);
@@ -1179,6 +1293,7 @@ fn save_from_dialog(hwnd: HWND) -> bool {
         s.switch_lang = switch;
         s.hotkey = hotkey.clone();
         s.digits_hotkey = if dg_text.is_empty() { String::new() } else { format_hotkey(&dg_text) };
+        s.snippets_hotkey = if sn_text.is_empty() { String::new() } else { format_hotkey(&sn_text) };
     });
     let want_startup = checked(hwnd, C_STARTUP);
     if want_startup != startup_entry().is_some() && !set_startup(want_startup) {
@@ -1210,24 +1325,32 @@ fn build_settings_window(hwnd: HWND) {
     }
     ui.label("", 270, 76, 200, 20, C_DG_STATUS);
 
-    ui.add("BUTTON", "Direction", BS_GROUPBOX as u32, 0, 12, 106, 456, 50, 0);
-    ui.radio("Auto (word by word)", 24, 126, 160, C_DIR_AUTO, true);
-    ui.radio("Arabic -> English", 190, 126, 130, C_DIR_AR2EN, false);
-    ui.radio("English -> Arabic", 326, 126, 130, C_DIR_EN2AR, false);
+    ui.label("Snippets:", 16, 108, 74, 20, 0);
+    let sn = ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 90, 104, 170, 24, C_SNIPPETS);
+    unsafe {
+        SetWindowSubclass(sn, Some(hotkey_capture), 3, 0);
+    }
+    ui.label("", 268, 108, 56, 20, C_SN_STATUS);
+    ui.add("BUTTON", "Edit list...", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 340, 102, 128, 26, C_SN_EDIT);
 
-    ui.check("Convert the text before the caret when nothing is selected", 16, 168, 440, C_LAST);
-    ui.radio("Last word only", 40, 192, 150, C_LAST_WORD, true);
-    ui.radio("Last words in the same language", 196, 192, 260, C_LAST_RUN, false);
+    ui.add("BUTTON", "Direction", BS_GROUPBOX as u32, 0, 12, 138, 456, 50, 0);
+    ui.radio("Auto (word by word)", 24, 158, 160, C_DIR_AUTO, true);
+    ui.radio("Arabic -> English", 190, 158, 130, C_DIR_AR2EN, false);
+    ui.radio("English -> Arabic", 326, 158, 130, C_DIR_EN2AR, false);
 
-    ui.check("Switch the keyboard language after converting", 16, 222, 440, C_SWITCH);
-    ui.check("Start with Windows", 16, 246, 440, C_STARTUP);
+    ui.check("Convert the text before the caret when nothing is selected", 16, 200, 440, C_LAST);
+    ui.radio("Last word only", 40, 224, 150, C_LAST_WORD, true);
+    ui.radio("Last words in the same language", 196, 224, 260, C_LAST_RUN, false);
 
-    ui.add("BUTTON", "Try it", BS_GROUPBOX as u32, 0, 12, 276, 456, 92, 0);
-    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 24, 296, 432, 24, C_TRY_IN);
-    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | ES_READONLY as u32, WS_EX_CLIENTEDGE, 24, 330, 432, 24, C_TRY_OUT);
+    ui.check("Switch the keyboard language after converting", 16, 254, 440, C_SWITCH);
+    ui.check("Start with Windows", 16, 278, 440, C_STARTUP);
 
-    ui.add("BUTTON", "Save", BS_DEFPUSHBUTTON as u32 | WS_TABSTOP, 0, 292, 382, 84, 28, IDOK as usize);
-    ui.add("BUTTON", "Cancel", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 382, 84, 28, IDCANCEL as usize);
+    ui.add("BUTTON", "Try it", BS_GROUPBOX as u32, 0, 12, 308, 456, 92, 0);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 24, 328, 432, 24, C_TRY_IN);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | ES_READONLY as u32, WS_EX_CLIENTEDGE, 24, 362, 432, 24, C_TRY_OUT);
+
+    ui.add("BUTTON", "Save", BS_DEFPUSHBUTTON as u32 | WS_TABSTOP, 0, 292, 414, 84, 28, IDOK as usize);
+    ui.add("BUTTON", "Cancel", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 414, 84, 28, IDCANCEL as usize);
 
     load_into_dialog(hwnd, &settings());
 }
@@ -1320,6 +1443,8 @@ unsafe extern "system" fn settings_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                 }
                 C_HOTKEY if code == EN_CHANGE => refresh_hotkey(hwnd),
                 C_DIGITS if code == EN_CHANGE => refresh_digits(hwnd),
+                C_SNIPPETS if code == EN_CHANGE => refresh_snippets(hwnd),
+                C_SN_EDIT if code == BN_CLICKED => open_snippets(),
                 C_TRY_IN if code == EN_CHANGE => refresh_try(hwnd),
                 C_DIR_AUTO | C_DIR_AR2EN | C_DIR_EN2AR if code == BN_CLICKED => refresh_try(hwnd),
                 C_LAST if code == BN_CLICKED => refresh_last_mode(hwnd),
@@ -1364,7 +1489,7 @@ fn open_settings() {
 
         let dpi = GetDpiForSystem() as i32;
         let style = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-        let mut rc = RECT { left: 0, top: 0, right: 480 * dpi / 96, bottom: 424 * dpi / 96 };
+        let mut rc = RECT { left: 0, top: 0, right: 480 * dpi / 96, bottom: 456 * dpi / 96 };
         AdjustWindowRectEx(&mut rc, style, 0, 0);
         let (w, h) = (rc.right - rc.left, rc.bottom - rc.top);
         let x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
@@ -1381,6 +1506,207 @@ fn open_settings() {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Snippets editor window
+// ---------------------------------------------------------------------------
+
+static SNIPPETS_HWND: AtomicUsize = AtomicUsize::new(0);
+static SNIPPETS_FONT: AtomicUsize = AtomicUsize::new(0);
+
+const S_LIST: usize = 3001;
+const S_TRIG: usize = 3002;
+const S_TEXT: usize = 3003;
+const S_SAVE: usize = 3004;
+const S_NEW: usize = 3005;
+const S_DEL: usize = 3006;
+const LBN_SELCHANGE: usize = 1;
+
+fn lb_select(hwnd: HWND, idx: Option<usize>) {
+    unsafe {
+        SendMessageW(GetDlgItem(hwnd, S_LIST as i32), LB_SETCURSEL, idx.unwrap_or(usize::MAX), 0);
+    }
+}
+
+fn lb_current(hwnd: HWND) -> Option<usize> {
+    let r = unsafe { SendMessageW(GetDlgItem(hwnd, S_LIST as i32), LB_GETCURSEL, 0, 0) };
+    if r < 0 {
+        None
+    } else {
+        Some(r as usize)
+    }
+}
+
+fn refresh_snippet_list(hwnd: HWND, select: Option<usize>) {
+    let list = snippets();
+    unsafe {
+        let lb = GetDlgItem(hwnd, S_LIST as i32);
+        SendMessageW(lb, LB_RESETCONTENT, 0, 0);
+        for sn in &list {
+            let w = wide(&sn.trigger);
+            SendMessageW(lb, LB_ADDSTRING, 0, w.as_ptr() as LPARAM);
+        }
+    }
+    lb_select(hwnd, select);
+}
+
+fn fill_snippet_fields(hwnd: HWND) {
+    let list = snippets();
+    match lb_current(hwnd).and_then(|i| list.get(i)) {
+        Some(sn) => {
+            set_dlg_text(hwnd, S_TRIG, &sn.trigger);
+            set_dlg_text(hwnd, S_TEXT, &sn.text.replace('\n', "\r\n"));
+        }
+        None => {
+            set_dlg_text(hwnd, S_TRIG, "");
+            set_dlg_text(hwnd, S_TEXT, "");
+        }
+    }
+}
+
+fn save_snippet(hwnd: HWND) {
+    let trigger = dlg_text(hwnd, S_TRIG).replace('=', " ").trim().to_string();
+    if trigger.is_empty() {
+        let t = wide("Type the trigger word first (for example: email).");
+        let c = wide("Baddel");
+        unsafe {
+            MessageBoxW(hwnd, t.as_ptr(), c.as_ptr(), MB_OK | MB_ICONWARNING);
+        }
+        return;
+    }
+    let text = dlg_text(hwnd, S_TEXT).replace("\r\n", "\n");
+    let mut at = 0usize;
+    update_snippets(|list| {
+        let key = trigger.to_lowercase();
+        match list.iter().position(|x| x.trigger.to_lowercase() == key) {
+            Some(i) => {
+                list[i] = Snippet { trigger: trigger.clone(), text: text.clone() };
+                at = i;
+            }
+            None => {
+                list.push(Snippet { trigger: trigger.clone(), text: text.clone() });
+                at = list.len() - 1;
+            }
+        }
+    });
+    refresh_snippet_list(hwnd, Some(at));
+}
+
+fn delete_snippet(hwnd: HWND) {
+    if let Some(i) = lb_current(hwnd) {
+        update_snippets(|list| {
+            if i < list.len() {
+                list.remove(i);
+            }
+        });
+        refresh_snippet_list(hwnd, None);
+        fill_snippet_fields(hwnd);
+    }
+}
+
+unsafe extern "system" fn snippets_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match msg {
+        WM_COMMAND => {
+            let id = wparam & 0xFFFF;
+            let code = (wparam >> 16) & 0xFFFF;
+            match id {
+                S_LIST if code == LBN_SELCHANGE => fill_snippet_fields(hwnd),
+                S_SAVE => save_snippet(hwnd),
+                S_NEW => {
+                    lb_select(hwnd, None);
+                    fill_snippet_fields(hwnd);
+                    SetFocus(GetDlgItem(hwnd, S_TRIG as i32));
+                }
+                S_DEL => delete_snippet(hwnd),
+                x if x == IDCANCEL as usize => {
+                    DestroyWindow(hwnd);
+                }
+                _ => {}
+            }
+            0
+        }
+        WM_CLOSE => {
+            DestroyWindow(hwnd);
+            0
+        }
+        WM_DESTROY => {
+            SNIPPETS_HWND.store(0, Ordering::Relaxed);
+            let f = SNIPPETS_FONT.swap(0, Ordering::Relaxed);
+            if f != 0 {
+                DeleteObject(f as _);
+            }
+            0
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn open_snippets() {
+    let existing = SNIPPETS_HWND.load(Ordering::Relaxed) as HWND;
+    if !existing.is_null() {
+        unsafe {
+            SetForegroundWindow(existing);
+        }
+        return;
+    }
+    unsafe {
+        let hinst = GetModuleHandleW(null());
+        let class_name = wide("BaddelSnippetsWindow");
+        let mut wc: WNDCLASSW = std::mem::zeroed();
+        wc.lpfnWndProc = Some(snippets_proc);
+        wc.hInstance = hinst;
+        wc.lpszClassName = class_name.as_ptr();
+        wc.hbrBackground = GetSysColorBrush(COLOR_BTNFACE);
+        wc.hIcon = LoadIconW(hinst, 1usize as *const u16);
+        RegisterClassW(&wc);
+
+        let dpi = GetDpiForSystem() as i32;
+        let style = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        let mut rc = RECT { left: 0, top: 0, right: 500 * dpi / 96, bottom: 352 * dpi / 96 };
+        AdjustWindowRectEx(&mut rc, style, 0, 0);
+        let (w, h) = (rc.right - rc.left, rc.bottom - rc.top);
+        let x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
+        let y = (GetSystemMetrics(SM_CYSCREEN) - h) / 3;
+        let title = wide("Baddel - Snippets");
+        let hwnd = CreateWindowExW(0, class_name.as_ptr(), title.as_ptr(), style, x, y, w, h, null_mut(), null_mut(), hinst, null());
+        if hwnd.is_null() {
+            return;
+        }
+        SNIPPETS_HWND.store(hwnd as usize, Ordering::Relaxed);
+
+        let face = wide("Segoe UI");
+        let font = CreateFontW(-(9 * dpi / 72), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, face.as_ptr()) as usize;
+        SNIPPETS_FONT.store(font, Ordering::Relaxed);
+        let ui = Ui { hwnd, font, dpi };
+
+        ui.add("LISTBOX", "", LBS_NOTIFY as u32 | WS_VSCROLL | WS_TABSTOP, WS_EX_CLIENTEDGE, 12, 12, 150, 286, S_LIST);
+        ui.label("Trigger (what you type):", 176, 12, 310, 18, 0);
+        ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 176, 32, 312, 24, S_TRIG);
+        ui.label("Text it turns into:", 176, 64, 310, 18, 0);
+        ui.add(
+            "EDIT",
+            "",
+            ES_MULTILINE as u32 | ES_AUTOVSCROLL as u32 | ES_WANTRETURN as u32 | WS_VSCROLL | WS_TABSTOP,
+            WS_EX_CLIENTEDGE,
+            176,
+            84,
+            312,
+            130,
+            S_TEXT,
+        );
+        ui.label("You can use {date} and {time}. Typing the trigger with the wrong keyboard language works too.", 176, 220, 312, 38, 0);
+        ui.add("BUTTON", "Save", BS_DEFPUSHBUTTON as u32 | WS_TABSTOP, 0, 176, 266, 96, 28, S_SAVE);
+        ui.add("BUTTON", "New", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 280, 266, 96, 28, S_NEW);
+        ui.add("BUTTON", "Delete", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 266, 104, 28, S_DEL);
+        ui.add("BUTTON", "Close", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 392, 312, 96, 28, IDCANCEL as usize);
+        ui.label("Press Ctrl+Alt+E after typing a trigger.", 12, 318, 370, 20, 0);
+
+        refresh_snippet_list(hwnd, None);
+        ShowWindow(hwnd, SW_SHOW);
+        SetForegroundWindow(hwnd);
+    }
+}
+
 pub fn run() {
     unsafe {
         // one copy only
@@ -1391,7 +1717,8 @@ pub fn run() {
         }
 
         let settings = load_settings();
-        *APP.lock().unwrap() = Some(App { settings, undo: None });
+        let snippets = load_snippets();
+        *APP.lock().unwrap() = Some(App { settings, snippets, undo: None });
 
         // keep the Start with Windows entry pointing at the file that is running now
         if let Some(cmd) = startup_entry() {
@@ -1424,8 +1751,15 @@ pub fn run() {
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
-            let dlg = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
-            if !dlg.is_null() && IsDialogMessageW(dlg, &msg) != 0 {
+            let mut handled = false;
+            for h in [SETTINGS_HWND.load(Ordering::Relaxed), SNIPPETS_HWND.load(Ordering::Relaxed)] {
+                let dlg = h as HWND;
+                if !dlg.is_null() && IsDialogMessageW(dlg, &msg) != 0 {
+                    handled = true;
+                    break;
+                }
+            }
+            if handled {
                 continue;
             }
             TranslateMessage(&msg);

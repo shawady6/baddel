@@ -29,6 +29,7 @@
 - **تراجع:** ضغطة تانية بترجّع الكلام زي ما كان.
 - **اختصار بتختاره:** اضغط الأزرار اللي عاوزها في الإعدادات وهتتسجل (Ctrl وAlt وShift وWin).
 - **أرقام هندية (اختياري):** اختصار تاني منفصل `Ctrl+Alt+H` بيحوّل `2026` ↔ `٢٠٢٦` للنص المحدد. الاختصار العادي مابيلمسش الأرقام. تقدر تغيّره أو تقفله من الإعدادات.
+- **اختصارات نصية (Snippets):** اكتب `email` واضغط `Ctrl+Alt+E` تتحوّل لإيميلك الكامل. بتحدد الكلمات والنصوص من «Edit list» في الإعدادات. بتفهم الكلمة حتى لو كتبتها بلغة الكيبورد الغلط، وتدعم `{date}` و`{time}`.
 - **اختياري:** يبدّل لغة الكيبورد بعد التحويل، ويفتح مع ويندوز.
 - **بيحافظ على الكليب بورد** بتاعك زي ما كان.
 
@@ -63,6 +64,7 @@ A small, fast Windows app (written in Rust) that works in any program: Word, bro
 - **Undo:** press the shortcut again to put the text back.
 - **Your own shortcut:** press the keys you want in Settings and they are recorded (Ctrl, Alt, Shift, Win).
 - **Hindi digits (optional):** a separate shortcut, `Ctrl+Alt+H`, turns `2026` ↔ `٢٠٢٦` in the selected text. The main shortcut never touches digits. Change or turn it off in Settings.
+- **Snippets:** type `email`, press `Ctrl+Alt+E`, and it becomes your full address. Manage the list from Settings > Edit list. It understands the trigger even if typed with the wrong keyboard language, and supports `{date}` and `{time}`.
 - **Optional:** switch the keyboard language after converting, start with Windows.
 - **Your clipboard is restored** after every conversion.
 

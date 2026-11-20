@@ -373,6 +373,7 @@ pub fn format_hotkey(text: &str) -> String {
 // Settings (a tiny key=value file)
 // ---------------------------------------------------------------------------
 
+pub const SNIPPETS_HOTKEY: &str = "Ctrl+Alt+E";
 pub const DIGITS_HOTKEY: &str = "Ctrl+Alt+H";
 pub const DEFAULT_HOTKEY: &str = "Ctrl+Shift+X";
 
@@ -398,6 +399,120 @@ pub fn convert_digits(text: &str) -> String {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Snippets: type a trigger, press the shortcut, get the text
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Snippet {
+    pub trigger: String,
+    pub text: String,
+}
+
+fn escape_snippet(text: &str) -> String {
+    text.replace('\\', "\\\\").replace("\r\n", "\n").replace('\n', "\\n")
+}
+
+fn unescape_snippet(text: &str) -> String {
+    let mut out = String::new();
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('\\') => out.push('\\'),
+                Some(o) => {
+                    out.push('\\');
+                    out.push(o);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// File format: one `trigger=text` per line, `\n` inside the text means a new line.
+pub fn parse_snippets(file: &str) -> Vec<Snippet> {
+    let mut list: Vec<Snippet> = Vec::new();
+    for line in file.lines() {
+        let line = line.trim_start_matches('\u{feff}');
+        if line.trim().is_empty() || line.trim_start().starts_with('#') {
+            continue;
+        }
+        let Some((t, body)) = line.split_once('=') else { continue };
+        let trigger = t.trim().to_string();
+        if trigger.is_empty() || list.iter().any(|x| x.trigger.to_lowercase() == trigger.to_lowercase()) {
+            continue;
+        }
+        list.push(Snippet { trigger, text: unescape_snippet(body) });
+    }
+    list
+}
+
+pub fn serialize_snippets(list: &[Snippet]) -> String {
+    let mut out = String::from(
+        "# Baddel snippets. One per line:  trigger=text   (use \\n for a new line; {date} and {time} are filled in)\r\n",
+    );
+    for sn in list {
+        out.push_str(&format!("{}={}\r\n", sn.trigger.replace('=', " "), escape_snippet(&sn.text)));
+    }
+    out
+}
+
+fn words_joined(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+}
+
+/// Index of the snippet whose trigger is `text` (ignoring case and spacing). `text` may also be the
+/// trigger typed with the wrong keyboard language.
+pub fn lookup_snippet(text: &str, list: &[Snippet]) -> Option<usize> {
+    let a = words_joined(text);
+    if a.is_empty() {
+        return None;
+    }
+    let flipped = words_joined(&convert(text, Direction::Auto));
+    list.iter()
+        .position(|sn| words_joined(&sn.trigger) == a)
+        .or_else(|| list.iter().position(|sn| words_joined(&sn.trigger) == flipped))
+}
+
+/// The snippet trigger that ends `prefix` (the text from the line start to the caret), preferring
+/// the longest one. Returns `(steps_before_trigger, trigger_text_as_typed, trailing_whitespace)`.
+pub fn find_snippet(prefix: &str, list: &[Snippet]) -> Option<(usize, String, String)> {
+    let core_end = prefix.trim_end().len();
+    let (core, trail) = prefix.split_at(core_end);
+    if core.is_empty() || list.is_empty() {
+        return None;
+    }
+    let mut tokens: Vec<usize> = Vec::new(); // byte offset of each word
+    let mut in_word = false;
+    for (i, c) in core.char_indices() {
+        if c.is_whitespace() {
+            in_word = false;
+        } else if !in_word {
+            in_word = true;
+            tokens.push(i);
+        }
+    }
+    let max_words = list.iter().map(|sn| sn.trigger.split_whitespace().count()).max().unwrap_or(1);
+    for n in (1..=max_words.min(tokens.len())).rev() {
+        let start = tokens[tokens.len() - n];
+        let tail = &core[start..];
+        if lookup_snippet(tail, list).is_some() {
+            return Some((key_steps(&core[..start]), tail.to_string(), trail.to_string()));
+        }
+    }
+    None
+}
+
+/// Fill `{date}` and `{time}` into a snippet's text.
+pub fn expand_placeholders(text: &str, date: &str, time: &str) -> String {
+    text.replace("{date}", date).replace("{time}", time)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub enabled: bool,
@@ -408,6 +523,8 @@ pub struct Settings {
     pub hotkey: String,
     /// Optional second shortcut: Western digits <-> Arabic-Indic digits. Empty = off.
     pub digits_hotkey: String,
+    /// Optional third shortcut: expand a snippet trigger into its text. Empty = off.
+    pub snippets_hotkey: String,
 }
 
 impl Default for Settings {
@@ -420,6 +537,7 @@ impl Default for Settings {
             switch_lang: false,
             hotkey: DEFAULT_HOTKEY.to_string(),
             digits_hotkey: DIGITS_HOTKEY.to_string(),
+            snippets_hotkey: SNIPPETS_HOTKEY.to_string(),
         }
     }
 }
@@ -453,6 +571,13 @@ impl Settings {
                         s.hotkey = format_hotkey(v);
                     }
                 }
+                "snippets_hotkey" => {
+                    if v.is_empty() {
+                        s.snippets_hotkey = String::new();
+                    } else if parse_hotkey(v).is_some() {
+                        s.snippets_hotkey = format_hotkey(v);
+                    }
+                }
                 "digits_hotkey" => {
                     if v.is_empty() {
                         s.digits_hotkey = String::new();
@@ -480,7 +605,9 @@ impl Settings {
              last_mode={}\r\n\
              switch_language={}\r\n\
              # digits_hotkey: Western digits <-> Arabic-Indic digits (0123 <-> \u{660}\u{661}\u{662}\u{663}). Leave empty to turn it off.\r\n\
-             digits_hotkey={}\r\n",
+             digits_hotkey={}\r\n\
+             # snippets_hotkey: type a trigger word and press it to get its text (edit the list in Settings). Leave empty to turn it off.\r\n\
+             snippets_hotkey={}\r\n",
             self.hotkey,
             self.direction.as_str(),
             b(self.enabled),
@@ -488,6 +615,7 @@ impl Settings {
             self.last_mode.as_str(),
             b(self.switch_lang),
             self.digits_hotkey,
+            self.snippets_hotkey,
         )
     }
 }
@@ -567,6 +695,7 @@ mod tests {
             switch_lang: true,
             hotkey: "Ctrl+Alt+Shift+K".into(),
             digits_hotkey: String::new(),
+            snippets_hotkey: "Ctrl+Alt+Shift+E".into(),
         };
         assert_eq!(Settings::parse(&s.serialize()), s);
         assert_eq!(Settings::parse(""), Settings::default());
@@ -620,5 +749,30 @@ mod tests {
         assert_eq!(Settings::parse("digits_hotkey=").digits_hotkey, "");
         assert_eq!(Settings::parse("digits_hotkey=ctrl+alt+d").digits_hotkey, "Ctrl+Alt+D");
         assert_eq!(Settings::parse("digits_hotkey=junk").digits_hotkey, "Ctrl+Alt+H");
+    }
+
+    #[test]
+    fn snippets_roundtrip_and_match() {
+        let list = parse_snippets("# c\nemail=me@example.com\nmy address=Line1\\nLine2\nEmail=dup\n");
+        assert_eq!(list.len(), 2); // the duplicate trigger is ignored
+        assert_eq!(list[1].text, "Line1\nLine2");
+        assert_eq!(parse_snippets(&serialize_snippets(&list)), list);
+        assert_eq!(lookup_snippet("EMAIL", &list), Some(0));
+        // the trigger typed with the Arabic layout still matches
+        let wrong = convert("email", Direction::EnToAr);
+        assert_eq!(lookup_snippet(&wrong, &list), Some(0));
+        assert_eq!(lookup_snippet("emails", &list), None);
+    }
+
+    #[test]
+    fn snippets_find_at_end_of_line() {
+        let list = parse_snippets("email=x\nmy address=y\n");
+        let (steps, tail, trail) = find_snippet("send to email ", &list).unwrap();
+        assert_eq!((steps, tail.as_str(), trail.as_str()), (8, "email", " "));
+        let (steps, tail, _) = find_snippet("hi my address", &list).unwrap();
+        assert_eq!((steps, tail.as_str()), (3, "my address"));
+        assert_eq!(find_snippet("nothing here", &list), None);
+        assert_eq!(find_snippet("", &list), None);
+        assert_eq!(expand_placeholders("on {date} at {time}", "2026-11-21", "01:10"), "on 2026-11-21 at 01:10");
     }
 }
