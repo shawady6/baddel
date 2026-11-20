@@ -46,7 +46,7 @@ use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
 use windows_sys::Win32::Foundation::RECT;
 
 use crate::core::{
-    convert, dominant_script, format_hotkey, hotkey_text, key_steps, last_unit, parse_hotkey, Direction, LastMode,
+    convert, convert_digits, dominant_script, format_hotkey, hotkey_text, key_steps, last_unit, parse_hotkey, Direction, LastMode,
     Script, Settings, DEFAULT_HOTKEY,
 };
 
@@ -57,6 +57,7 @@ const WM_TRAY: u32 = WM_APP + 1;
 const WM_INPUTLANGCHANGEREQUEST: u32 = 0x0050;
 const HOTKEY_ID: i32 = 1;
 const HOTKEY_SLOTS: i32 = 16;
+const DIGITS_ID: i32 = 100; // second shortcut (digits) uses ids 100..116
 const TIMER_LAYOUTS: usize = 77;
 const CF_UNICODETEXT: u32 = 13;
 
@@ -577,7 +578,14 @@ fn try_undo(s: &Settings) -> bool {
     false
 }
 
-fn fix_inner(s: &Settings) {
+/// What a shortcut does to the text: `conv` turns the selection (or last word) into the new text.
+struct Action<'a> {
+    conv: &'a dyn Fn(&str) -> String,
+    mode: LastMode,
+    switch: bool,
+}
+
+fn fix_inner(s: &Settings, act: &Action) {
     let mut converted_from: Option<(String, String)> = None; // (original selection, text to paste)
 
     match copy_selection() {
@@ -587,7 +595,7 @@ fn fix_inner(s: &Settings) {
             if core.is_empty() {
                 return;
             }
-            let out = format!("{}{}", convert(core, s.direction), trail);
+            let out = format!("{}{}", (act.conv)(core), trail);
             if out != sel {
                 converted_from = Some((sel.clone(), out));
             }
@@ -600,7 +608,7 @@ fn fix_inner(s: &Settings) {
                 return;
             }
             let Some(prefix) = select_line_prefix() else { return };
-            let Some((steps, unit, trail)) = last_unit(&prefix, s.last_mode) else {
+            let Some((steps, unit, trail)) = last_unit(&prefix, act.mode) else {
                 collapse(guess_dir(&prefix));
                 return;
             };
@@ -612,7 +620,7 @@ fn fix_inner(s: &Settings) {
                     return;
                 }
             };
-            let out = format!("{}{}", convert(&unit, s.direction), trail);
+            let out = format!("{}{}", (act.conv)(&unit), trail);
             if out == orig {
                 collapse(dir);
                 return;
@@ -624,23 +632,29 @@ fn fix_inner(s: &Settings) {
     if let Some((orig, out)) = converted_from {
         if paste_text(&out) {
             remember_undo(&out, &orig);
-            if s.switch_lang {
+            if act.switch && s.switch_lang {
                 switch_layout_for(&out);
             }
         }
     }
 }
 
-fn do_fix() {
+fn do_action(digits: bool) {
     let s = settings();
     if !s.enabled {
         return;
     }
-    if let Some(hk) = parse_hotkey(&s.hotkey) {
+    let text = if digits { &s.digits_hotkey } else { &s.hotkey };
+    if let Some(hk) = parse_hotkey(text) {
         wait_release(&hotkey_vks(hk.vk));
     }
     let saved = save_clipboard();
-    fix_inner(&s);
+    if digits {
+        fix_inner(&s, &Action { conv: &convert_digits, mode: LastMode::Word, switch: false });
+    } else {
+        let dir = s.direction;
+        fix_inner(&s, &Action { conv: &move |t: &str| convert(t, dir), mode: s.last_mode, switch: true });
+    }
     restore_clipboard(saved);
 }
 
@@ -832,26 +846,31 @@ fn register_hotkey_ex(hwnd: HWND, announce: bool) {
     unsafe {
         for i in 0..HOTKEY_SLOTS {
             UnregisterHotKey(hwnd, HOTKEY_ID + i);
+            UnregisterHotKey(hwnd, DIGITS_ID + i);
         }
     }
     *LAYOUT_SIG.lock().unwrap() = layout_signature();
-    match parse_hotkey(&s.hotkey) {
-        Some(hk) => {
-            let vks = hotkey_vks(hk.vk);
-            let mut main_ok = false;
-            for (i, vk) in vks.iter().enumerate() {
-                let ok = unsafe { RegisterHotKey(hwnd, HOTKEY_ID + i as i32, hk.mods | MOD_NOREPEAT, *vk) };
-                if i == 0 {
-                    main_ok = ok != 0;
+    for (text, base, name) in [(s.hotkey.as_str(), HOTKEY_ID, "shortcut"), (s.digits_hotkey.as_str(), DIGITS_ID, "digits shortcut")] {
+        if text.is_empty() {
+            continue; // the digits shortcut is optional
+        }
+        match parse_hotkey(text) {
+            Some(hk) => {
+                let mut main_ok = false;
+                for (i, vk) in hotkey_vks(hk.vk).iter().enumerate() {
+                    let ok = unsafe { RegisterHotKey(hwnd, base + i as i32, hk.mods | MOD_NOREPEAT, *vk) };
+                    if i == 0 {
+                        main_ok = ok != 0;
+                    }
+                }
+                if !main_ok && announce {
+                    balloon("Baddel", &format!("{} ({}) is already used by another program. Pick another one in Settings.", text, name));
                 }
             }
-            if !main_ok && announce {
-                balloon("Baddel", &format!("{} is already used by another program. Pick another shortcut in Settings.", s.hotkey));
-            }
-        }
-        None => {
-            if announce {
-                balloon("Baddel", "The shortcut in the settings file is not valid.");
+            None => {
+                if announce {
+                    balloon("Baddel", &format!("The {} in the settings file is not valid.", name));
+                }
             }
         }
     }
@@ -915,7 +934,7 @@ fn on_command(hwnd: HWND, id: usize) {
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_HOTKEY => {
-            do_fix();
+            do_action(wparam as i32 >= DIGITS_ID);
             0
         }
         WM_TIMER if wparam == TIMER_LAYOUTS => {
@@ -942,6 +961,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             remove_tray(hwnd);
             for i in 0..HOTKEY_SLOTS {
                 UnregisterHotKey(hwnd, HOTKEY_ID + i);
+                UnregisterHotKey(hwnd, DIGITS_ID + i);
             }
             KillTimer(hwnd, TIMER_LAYOUTS);
             PostQuitMessage(0);
@@ -966,6 +986,8 @@ static SETTINGS_FONT: AtomicUsize = AtomicUsize::new(0);
 const C_ENABLED: usize = 2001;
 const C_HOTKEY: usize = 2002;
 const C_HK_STATUS: usize = 2003;
+const C_DIGITS: usize = 2004;
+const C_DG_STATUS: usize = 2005;
 const C_DIR_AUTO: usize = 2010;
 const C_DIR_AR2EN: usize = 2011;
 const C_DIR_EN2AR: usize = 2012;
@@ -1071,6 +1093,19 @@ fn refresh_hotkey(hwnd: HWND) {
     set_dlg_text(hwnd, C_HK_STATUS, &msg);
 }
 
+fn refresh_digits(hwnd: HWND) {
+    let text = dlg_text(hwnd, C_DIGITS);
+    let msg = if text.trim().is_empty() {
+        "Off  (press the keys to turn on)".to_string()
+    } else {
+        match parse_hotkey(&text) {
+            Some(hk) => format!("OK  {}", hotkey_text(hk.mods, hk.vk).unwrap_or_else(|| format_hotkey(&text))),
+            None => "Click the box and press the keys".to_string(),
+        }
+    };
+    set_dlg_text(hwnd, C_DG_STATUS, &msg);
+}
+
 fn refresh_last_mode(hwnd: HWND) {
     let on = checked(hwnd, C_LAST);
     unsafe {
@@ -1082,6 +1117,7 @@ fn refresh_last_mode(hwnd: HWND) {
 fn load_into_dialog(hwnd: HWND, s: &Settings) {
     set_checked(hwnd, C_ENABLED, s.enabled);
     set_dlg_text(hwnd, C_HOTKEY, &s.hotkey);
+    set_dlg_text(hwnd, C_DIGITS, &s.digits_hotkey);
     unsafe {
         let id = match s.direction {
             Direction::Auto => C_DIR_AUTO,
@@ -1097,6 +1133,7 @@ fn load_into_dialog(hwnd: HWND, s: &Settings) {
     set_checked(hwnd, C_STARTUP, startup_entry().is_some());
     set_dlg_text(hwnd, C_TRY_IN, "hgsghl ugd;l");
     refresh_hotkey(hwnd);
+    refresh_digits(hwnd);
     refresh_last_mode(hwnd);
     refresh_try(hwnd);
 }
@@ -1111,6 +1148,23 @@ fn save_from_dialog(hwnd: HWND) -> bool {
         }
         return false;
     }
+    let dg_text = dlg_text(hwnd, C_DIGITS);
+    let dg_text = dg_text.trim().to_string();
+    if !dg_text.is_empty() {
+        let bad = match parse_hotkey(&dg_text) {
+            None => Some("The digits shortcut is not valid.\nPress the keys you want, or press Backspace to turn it off."),
+            Some(_) if format_hotkey(&dg_text) == format_hotkey(&hk_text) => Some("The digits shortcut must be different from the main shortcut."),
+            Some(_) => None,
+        };
+        if let Some(msg) = bad {
+            let t = wide(msg);
+            let c = wide("Baddel");
+            unsafe {
+                MessageBoxW(hwnd, t.as_ptr(), c.as_ptr(), MB_OK | MB_ICONWARNING);
+            }
+            return false;
+        }
+    }
     let direction = dialog_direction(hwnd);
     let enabled = checked(hwnd, C_ENABLED);
     let last = checked(hwnd, C_LAST);
@@ -1124,6 +1178,7 @@ fn save_from_dialog(hwnd: HWND) -> bool {
         s.last_mode = mode;
         s.switch_lang = switch;
         s.hotkey = hotkey.clone();
+        s.digits_hotkey = if dg_text.is_empty() { String::new() } else { format_hotkey(&dg_text) };
     });
     let want_startup = checked(hwnd, C_STARTUP);
     if want_startup != startup_entry().is_some() && !set_startup(want_startup) {
@@ -1148,24 +1203,31 @@ fn build_settings_window(hwnd: HWND) {
     }
     ui.label("", 270, 44, 200, 20, C_HK_STATUS);
 
-    ui.add("BUTTON", "Direction", BS_GROUPBOX as u32, 0, 12, 74, 456, 50, 0);
-    ui.radio("Auto (word by word)", 24, 94, 160, C_DIR_AUTO, true);
-    ui.radio("Arabic -> English", 190, 94, 130, C_DIR_AR2EN, false);
-    ui.radio("English -> Arabic", 326, 94, 130, C_DIR_EN2AR, false);
+    ui.label("Digits \u{660}\u{661}\u{662}:", 16, 76, 74, 20, 0);
+    let dg = ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 90, 72, 170, 24, C_DIGITS);
+    unsafe {
+        SetWindowSubclass(dg, Some(hotkey_capture), 2, 0);
+    }
+    ui.label("", 270, 76, 200, 20, C_DG_STATUS);
 
-    ui.check("Convert the text before the caret when nothing is selected", 16, 136, 440, C_LAST);
-    ui.radio("Last word only", 40, 160, 150, C_LAST_WORD, true);
-    ui.radio("Last words in the same language", 196, 160, 260, C_LAST_RUN, false);
+    ui.add("BUTTON", "Direction", BS_GROUPBOX as u32, 0, 12, 106, 456, 50, 0);
+    ui.radio("Auto (word by word)", 24, 126, 160, C_DIR_AUTO, true);
+    ui.radio("Arabic -> English", 190, 126, 130, C_DIR_AR2EN, false);
+    ui.radio("English -> Arabic", 326, 126, 130, C_DIR_EN2AR, false);
 
-    ui.check("Switch the keyboard language after converting", 16, 190, 440, C_SWITCH);
-    ui.check("Start with Windows", 16, 214, 440, C_STARTUP);
+    ui.check("Convert the text before the caret when nothing is selected", 16, 168, 440, C_LAST);
+    ui.radio("Last word only", 40, 192, 150, C_LAST_WORD, true);
+    ui.radio("Last words in the same language", 196, 192, 260, C_LAST_RUN, false);
 
-    ui.add("BUTTON", "Try it", BS_GROUPBOX as u32, 0, 12, 244, 456, 92, 0);
-    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 24, 264, 432, 24, C_TRY_IN);
-    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | ES_READONLY as u32, WS_EX_CLIENTEDGE, 24, 298, 432, 24, C_TRY_OUT);
+    ui.check("Switch the keyboard language after converting", 16, 222, 440, C_SWITCH);
+    ui.check("Start with Windows", 16, 246, 440, C_STARTUP);
 
-    ui.add("BUTTON", "Save", BS_DEFPUSHBUTTON as u32 | WS_TABSTOP, 0, 292, 350, 84, 28, IDOK as usize);
-    ui.add("BUTTON", "Cancel", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 350, 84, 28, IDCANCEL as usize);
+    ui.add("BUTTON", "Try it", BS_GROUPBOX as u32, 0, 12, 276, 456, 92, 0);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | WS_TABSTOP, WS_EX_CLIENTEDGE, 24, 296, 432, 24, C_TRY_IN);
+    ui.add("EDIT", "", ES_AUTOHSCROLL as u32 | ES_READONLY as u32, WS_EX_CLIENTEDGE, 24, 330, 432, 24, C_TRY_OUT);
+
+    ui.add("BUTTON", "Save", BS_DEFPUSHBUTTON as u32 | WS_TABSTOP, 0, 292, 382, 84, 28, IDOK as usize);
+    ui.add("BUTTON", "Cancel", BS_PUSHBUTTON as u32 | WS_TABSTOP, 0, 384, 382, 84, 28, IDCANCEL as usize);
 
     load_into_dialog(hwnd, &settings());
 }
@@ -1182,6 +1244,11 @@ unsafe extern "system" fn hotkey_capture(
     match msg {
         WM_KEYDOWN | WM_SYSKEYDOWN => {
             let mut vk = wparam as u32;
+            if (vk == 0x08 || vk == 0x2E) && !is_down(VK_CONTROL as i32) && !is_down(VK_MENU as i32) && !is_down(VK_SHIFT as i32) {
+                let w = wide("");
+                SetWindowTextW(hwnd, w.as_ptr()); // Backspace / Delete clears the box
+                return 0;
+            }
             if !matches!(vk, 0x10 | 0x11 | 0x12 | 0x5B | 0x5C | 0xA0..=0xA5) {
                 // other layouts report other codes for the same physical key: use the US meaning
                 let sc = ((lparam >> 16) & 0xFF) as u32;
@@ -1252,6 +1319,7 @@ unsafe extern "system" fn settings_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     DestroyWindow(hwnd);
                 }
                 C_HOTKEY if code == EN_CHANGE => refresh_hotkey(hwnd),
+                C_DIGITS if code == EN_CHANGE => refresh_digits(hwnd),
                 C_TRY_IN if code == EN_CHANGE => refresh_try(hwnd),
                 C_DIR_AUTO | C_DIR_AR2EN | C_DIR_EN2AR if code == BN_CLICKED => refresh_try(hwnd),
                 C_LAST if code == BN_CLICKED => refresh_last_mode(hwnd),
@@ -1296,7 +1364,7 @@ fn open_settings() {
 
         let dpi = GetDpiForSystem() as i32;
         let style = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-        let mut rc = RECT { left: 0, top: 0, right: 480 * dpi / 96, bottom: 392 * dpi / 96 };
+        let mut rc = RECT { left: 0, top: 0, right: 480 * dpi / 96, bottom: 424 * dpi / 96 };
         AdjustWindowRectEx(&mut rc, style, 0, 0);
         let (w, h) = (rc.right - rc.left, rc.bottom - rc.top);
         let x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;

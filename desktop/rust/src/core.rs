@@ -373,7 +373,30 @@ pub fn format_hotkey(text: &str) -> String {
 // Settings (a tiny key=value file)
 // ---------------------------------------------------------------------------
 
+pub const DIGITS_HOTKEY: &str = "Ctrl+Alt+H";
 pub const DEFAULT_HOTKEY: &str = "Ctrl+Shift+X";
+
+/// Western digits become Arabic-Indic digits (0123 -> \u{660}\u{661}\u{662}\u{663}). When the text has
+/// no Western digit but has Arabic-Indic (or Persian) ones, they go back to Western.
+pub fn convert_digits(text: &str) -> String {
+    let has_western = text.chars().any(|c| c.is_ascii_digit());
+    text.chars()
+        .map(|c| {
+            if has_western {
+                match c {
+                    '0'..='9' => char::from_u32(0x0660 + (c as u32 - '0' as u32)).unwrap_or(c),
+                    _ => c,
+                }
+            } else {
+                match c {
+                    '\u{0660}'..='\u{0669}' => char::from_u32('0' as u32 + (c as u32 - 0x0660)).unwrap_or(c),
+                    '\u{06F0}'..='\u{06F9}' => char::from_u32('0' as u32 + (c as u32 - 0x06F0)).unwrap_or(c),
+                    _ => c,
+                }
+            }
+        })
+        .collect()
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
@@ -383,6 +406,8 @@ pub struct Settings {
     pub last_mode: LastMode,
     pub switch_lang: bool,
     pub hotkey: String,
+    /// Optional second shortcut: Western digits <-> Arabic-Indic digits. Empty = off.
+    pub digits_hotkey: String,
 }
 
 impl Default for Settings {
@@ -394,6 +419,7 @@ impl Default for Settings {
             last_mode: LastMode::Run,
             switch_lang: false,
             hotkey: DEFAULT_HOTKEY.to_string(),
+            digits_hotkey: DIGITS_HOTKEY.to_string(),
         }
     }
 }
@@ -427,6 +453,13 @@ impl Settings {
                         s.hotkey = format_hotkey(v);
                     }
                 }
+                "digits_hotkey" => {
+                    if v.is_empty() {
+                        s.digits_hotkey = String::new();
+                    } else if parse_hotkey(v).is_some() {
+                        s.digits_hotkey = format_hotkey(v);
+                    }
+                }
                 _ => {}
             }
         }
@@ -445,13 +478,16 @@ impl Settings {
              last_word={}\r\n\
              # last_mode: run (the words before the caret in the same language) or word (just one)\r\n\
              last_mode={}\r\n\
-             switch_language={}\r\n",
+             switch_language={}\r\n\
+             # digits_hotkey: Western digits <-> Arabic-Indic digits (0123 <-> \u{660}\u{661}\u{662}\u{663}). Leave empty to turn it off.\r\n\
+             digits_hotkey={}\r\n",
             self.hotkey,
             self.direction.as_str(),
             b(self.enabled),
             b(self.last_word),
             self.last_mode.as_str(),
             b(self.switch_lang),
+            self.digits_hotkey,
         )
     }
 }
@@ -530,6 +566,7 @@ mod tests {
             last_mode: LastMode::Word,
             switch_lang: true,
             hotkey: "Ctrl+Alt+Shift+K".into(),
+            digits_hotkey: String::new(),
         };
         assert_eq!(Settings::parse(&s.serialize()), s);
         assert_eq!(Settings::parse(""), Settings::default());
@@ -565,5 +602,23 @@ mod tests {
             assert_eq!(hotkey_text(hk.mods, hk.vk).unwrap(), format_hotkey(text));
         }
         assert_eq!(hotkey_text(0, 0x58), None);
+    }
+
+    #[test]
+    fn digits_both_ways() {
+        assert_eq!(convert_digits("رقم 2026 و 15"), "رقم \u{662}\u{660}\u{662}\u{666} و \u{661}\u{665}");
+        assert_eq!(convert_digits("\u{662}\u{660}\u{662}\u{666}"), "2026");
+        assert_eq!(convert_digits("\u{6F1}\u{6F2}"), "12");
+        assert_eq!(convert_digits("بدون أرقام"), "بدون أرقام");
+        // mixed: Western wins, Arabic-Indic ones stay
+        assert_eq!(convert_digits("1\u{662}"), "\u{661}\u{662}");
+    }
+
+    #[test]
+    fn digits_hotkey_setting() {
+        assert_eq!(Settings::default().digits_hotkey, "Ctrl+Alt+H");
+        assert_eq!(Settings::parse("digits_hotkey=").digits_hotkey, "");
+        assert_eq!(Settings::parse("digits_hotkey=ctrl+alt+d").digits_hotkey, "Ctrl+Alt+D");
+        assert_eq!(Settings::parse("digits_hotkey=junk").digits_hotkey, "Ctrl+Alt+H");
     }
 }

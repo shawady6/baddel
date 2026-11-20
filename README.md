@@ -28,6 +28,7 @@
 - **من غير تحديد:** بيحوّل آخر كلمة، أو آخر كلمات كتبتها بنفس اللغة.
 - **تراجع:** ضغطة تانية بترجّع الكلام زي ما كان.
 - **اختصار بتختاره:** اضغط الأزرار اللي عاوزها في الإعدادات وهتتسجل (Ctrl وAlt وShift وWin).
+- **أرقام هندية (اختياري):** اختصار تاني منفصل `Ctrl+Alt+H` بيحوّل `2026` ↔ `٢٠٢٦` للنص المحدد. الاختصار العادي مابيلمسش الأرقام. تقدر تغيّره أو تقفله من الإعدادات.
 - **اختياري:** يبدّل لغة الكيبورد بعد التحويل، ويفتح مع ويندوز.
 - **بيحافظ على الكليب بورد** بتاعك زي ما كان.
 
@@ -61,6 +62,7 @@ A small, fast Windows app (written in Rust) that works in any program: Word, bro
 - **Nothing selected?** It converts the last word, or the last words you typed in the same language.
 - **Undo:** press the shortcut again to put the text back.
 - **Your own shortcut:** press the keys you want in Settings and they are recorded (Ctrl, Alt, Shift, Win).
+- **Hindi digits (optional):** a separate shortcut, `Ctrl+Alt+H`, turns `2026` ↔ `٢٠٢٦` in the selected text. The main shortcut never touches digits. Change or turn it off in Settings.
 - **Optional:** switch the keyboard language after converting, start with Windows.
 - **Your clipboard is restored** after every conversion.
 
