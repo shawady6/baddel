@@ -77,4 +77,12 @@ t("normalize keeps disabled", A.normalizeSettings({ enabled: false }).enabled ==
 
 require("./test_ahk.js")(t);
 
+// Rust app: generated tables must match extension/shared.js
+{
+  const rust = require("../scripts/gen_rust.js");
+  const fsx = require("fs");
+  t("rust: tables.rs is up to date (run node scripts/gen_rust.js)",
+    fsx.readFileSync(rust.file, "utf8") === rust.build());
+}
+
 process.exit(fail ? 1 : 0);

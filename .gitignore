@@ -1,4 +1,6 @@
+*.log
+.DS_Store
+desktop/rust/Output/
+desktop/rust/target/
 dist/
 node_modules/
-.DS_Store
-*.log

@@ -1,0 +1,80 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "desktop/rust/**"
+      - "scripts/gen_rust.js"
+      - "extension/shared.js"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Also commit baddel.exe and Baddel-Setup.exe to docs/downloads (updates the website)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Conversion tables are up to date
+        shell: bash
+        run: |
+          node scripts/gen_rust.js
+          git diff --exit-code desktop/rust/src/tables.rs
+
+      - name: Test
+        working-directory: desktop/rust
+        run: cargo test --release
+
+      - name: Build
+        working-directory: desktop/rust
+        run: cargo build --release
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          $candidates = @("C:\Program Files (x86)\Inno Setup 6\ISCC.exe", "C:\Program Files\Inno Setup 6\ISCC.exe")
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          & $iscc desktop/rust/baddel.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          mkdir out
+          Copy-Item desktop/rust/target/release/baddel.exe out/baddel.exe
+          Copy-Item desktop/rust/Output/Baddel-Setup.exe out/Baddel-Setup.exe
+          Get-FileHash out/*.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Tee-Object out/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baddel-windows
+          path: out/*
+
+      - name: Publish to the website
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        shell: bash
+        run: |
+          cp out/baddel.exe docs/downloads/baddel.exe
+          cp out/Baddel-Setup.exe docs/downloads/Baddel-Setup.exe
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/downloads/baddel.exe docs/downloads/Baddel-Setup.exe
+          git commit -m "Publish Windows build from CI"
+          git push
